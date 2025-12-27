@@ -91,6 +91,123 @@ A lightweight .NET web application providing **health monitoring and analytics c
 
 ## Changelog
 
+### 2025-12-27 - Naglfar Validation: YARP Proxy & Authentication Gateway
+
+#### Added
+- **✅ YARP Reverse Proxy Integration** (`services/naglfar-validation/`):
+  - **Package Added**: `Yarp.ReverseProxy` (2.2.0) to NaglfartAnalytics.csproj
+  - **Catch-All Proxy Configuration** (`appsettings.json:9-32`):
+    - Single route `{**catch-all}` proxies all non-infrastructure requests
+    - Target cluster: `book-store-cluster` → `http://protected-service-eu:8000/`
+    - Zero-configuration approach: add any endpoint to backend → automatic proxy
+  - **Middleware Registration** (`Program.cs:40-42, 87`):
+    - `AddReverseProxy().LoadFromConfig()` - Load routes from configuration
+    - `app.MapReverseProxy()` - Register as catch-all (runs last)
+
+- **✅ Authentication Middleware** (`AuthenticationMiddleware.cs`):
+  - **E-TOKEN Generation**: Creates ephemeral UUID tokens for unauthenticated users
+  - **Cookie-Based Auth**: Checks for `auth-token` cookie on all requests
+  - **Redirect Flow**: Redirects unauthenticated users to auth-service
+  - **Infrastructure Bypass**: Exempts `/healthz`, `/readyz`, `/metrics`, `/api/v1/info`, `/swagger`
+
+  **E-TOKEN Properties**:
+  ```csharp
+  - Format: UUID (e.g., "a1b2c3d4-...")
+  - Cookie Name: "e-token" (configurable)
+  - Lifetime: 15 minutes
+  - Security: HttpOnly, Secure, SameSite=Lax
+  ```
+
+  **Redirect URL Format**:
+  ```
+  http://localhost:8090/auth?return_url=<encoded-url>&e_token=<uuid>
+  ```
+
+- **✅ Authentication Configuration** (`appsettings.json:9-13`):
+  ```json
+  {
+    "Authentication": {
+      "CookieName": "auth-token",
+      "ETokenCookieName": "e-token",
+      "AuthServiceUrl": "http://localhost:8090/auth"
+    }
+  }
+  ```
+
+- **✅ Comprehensive Authentication Tests** (`tests/AuthenticationTests.cs`):
+  - **10 new tests** covering authentication middleware:
+    1. `InfrastructureEndpoints_AreExemptFromAuth_*` (4 tests) - Verify exempt endpoints
+    2. `ProtectedEndpoint_WithoutAuthCookie_RedirectsToAuthService` - Redirect behavior
+    3. `ProtectedEndpoint_WithoutAuthCookie_SetsETokenCookie` - E-TOKEN cookie creation
+    4. `ProtectedEndpoint_WithAuthCookie_AllowsRequest` - Authenticated requests allowed
+    5. `ETokenCookie_HasCorrectMaxAge` - Cookie expiration (900 seconds)
+    6. `RedirectUrl_IncludesOriginalPath` - Return URL preservation
+    7. `ExistingEToken_IsReusedInRedirect` - E-TOKEN reuse
+  - **Test Results**: 20/20 passing (10 auth + 9 integration + 1 metrics)
+
+- **✅ Service Documentation** (`services/naglfar-validation/README.md`):
+  - **Mermaid Flowcharts** (2 diagrams):
+    1. Authentication Flow - E-TOKEN generation and redirect logic
+    2. Request Routing - Traefik → Validation → Backend flow
+  - **Comprehensive Sections**:
+    - Authentication & E-TOKEN System (purpose, properties, flow)
+    - YARP Reverse Proxy (configuration, benefits, catch-all approach)
+    - Request Processing Pipeline (middleware order)
+    - Configuration examples (Auth, YARP)
+  - **Updated Project Structure**: Added AuthenticationMiddleware.cs, AuthenticationTests.cs
+
+#### Changed
+- **✅ Middleware Pipeline Order** (`Program.cs:57-87`):
+  ```
+  1. HTTP Metrics (Prometheus)
+  2. Authentication Middleware ← NEW (runs before proxy!)
+  3. Infrastructure Endpoints (healthz, readyz, metrics, info)
+  4. YARP Reverse Proxy ← NEW (catch-all, runs last)
+  ```
+
+  **Critical**: Authentication runs BEFORE proxy to ensure all proxied requests are authenticated.
+
+- **✅ Gateway Routing Pattern**:
+  - **Before**: Service had no proxy capability
+  - **After**: Acts as authentication gateway + reverse proxy
+  - **Infrastructure Endpoints**: Handled locally by naglfar-validation
+  - **All Other Requests**: Proxied to book-store (or future backend services)
+
+#### Technical Details
+- **Request Flow**:
+  ```
+  User → Traefik (api.local) → Naglfar Validation → Check auth-token
+    ├─ Has auth-token → YARP Proxy → Backend Service
+    └─ No auth-token → Generate E-TOKEN → Redirect to auth-service
+  ```
+
+- **YARP Benefits**:
+  - ✅ No endpoint knowledge required (true gateway pattern)
+  - ✅ Zero configuration updates when backend adds endpoints
+  - ✅ Single configuration entry for unlimited backend routes
+  - ✅ Future-proof: easy to add more backend services
+
+- **TODO Comments Added** (2 critical items):
+  1. **Make E-TOKEN More Robust**:
+     - Add timestamp/expiration
+     - Add signature/validation (HMAC-SHA256)
+     - Store in Redis for distributed validation
+     - Implement rotation policy
+
+  2. **Create Auth-Service** (next milestone):
+     - Implement OAuth2/OIDC flow
+     - Multi-provider support (Google, GitHub, etc.)
+     - Token validation and refresh
+     - User session management
+
+#### Benefits
+- ✅ **Centralized Authentication**: Single point of auth enforcement
+- ✅ **E-TOKEN Tracking**: Correlate pre-auth and post-auth requests
+- ✅ **Security**: HttpOnly, Secure, SameSite cookies prevent XSS/CSRF
+- ✅ **Scalable**: Catch-all proxy supports unlimited backend endpoints
+- ✅ **Maintainable**: Gateway doesn't need to know backend API structure
+- ✅ **Testable**: 10 comprehensive tests validate auth behavior
+
 ### 2025-12-27 - Book Store Service Complete Implementation & Refactoring
 
 #### Added

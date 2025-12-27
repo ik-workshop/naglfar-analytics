@@ -57,6 +57,10 @@ if (app.Environment.IsDevelopment())
 // Prometheus metrics middleware
 app.UseHttpMetrics();
 
+// Authentication middleware - check for auth cookie and create E-TOKEN if needed
+// This runs BEFORE YARP proxy to ensure all proxied requests are authenticated
+app.UseMiddleware<NaglfartAnalytics.AuthenticationMiddleware>();
+
 // Health check endpoints (unversioned - infrastructure)
 app.MapGet("/healthz", () => Results.Ok(new { status = "Healthy" }))
     .WithName("HealthCheck")

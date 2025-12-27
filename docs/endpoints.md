@@ -24,13 +24,19 @@ curl -H "Host: api.local" http://localhost/api/v1/info
 ## Book Store Endpoints
 
 **Access Methods:**
-1. **Via API Gateway (api.local)** - YARP reverse proxy through naglfar-validation service (Recommended)
+1. **Via API Gateway (api.local)** - YARP catch-all reverse proxy through naglfar-validation service (Recommended)
 2. **Via Direct Traefik (book-store-eu.local)** - Direct routing to book-store service
 3. **Direct Access** - Port 8081 (container port 8000)
 
+**API Gateway Routing:**
+The naglfar-validation service acts as a smart gateway:
+- **Infrastructure endpoints** (`/healthz`, `/readyz`, `/metrics`, `/api/v1/info`) → Handled locally by naglfar-validation
+- **All other requests** → Proxied to book-store service via YARP catch-all route
+- This means you can add any number of endpoints to book-store without updating the gateway configuration!
+
 ### Quick Reference - API Gateway Access (Recommended)
 
-All book-store endpoints are accessible through the API gateway at `api.local`:
+All book-store endpoints are automatically accessible through the API gateway at `api.local`:
 
 ```sh
 # Books
