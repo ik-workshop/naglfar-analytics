@@ -91,6 +91,82 @@ A lightweight .NET web application providing **health monitoring and analytics c
 
 ## Changelog
 
+### 2025-12-27 - Architecture Diagrams & Documentation
+
+#### Added
+- **✅ Comprehensive Architecture Diagrams** (9 diagrams total)
+  - **Diagram Infrastructure** (`docs/assets/diagrams/`):
+    - 9 Mermaid source files (`.mmd`) as single source of truth
+    - 9 SVG outputs for documentation rendering
+    - Docker-based generation workflow (no npm required)
+    - Automated validation and syntax checking
+
+  - **Diagram Types**:
+    1. **System Architecture** (`01-system-architecture.svg`) - Complete system overview with all components
+    2. **Authentication Flow** (`02-authentication-flow.svg`) - E-token → auth-token sequence
+    3. **Request Flow - Allowed** (`03-request-flow-allowed.svg`) - Clean traffic flow
+    4. **Request Flow - Blocked IP** (`04-request-flow-blocked-ip.svg`) - IP blocking scenario
+    5. **Request Flow - Blocked Token** (`05-request-flow-blocked-token.svg`) - Token compromise
+    6. **Data Pipeline** (`06-data-pipeline.svg`) - 4-stage analytics pipeline
+    7. **Architecture Components** (`07-architecture-components.svg`) - Layered architecture view
+    8. **Architecture Data Flow** (`08-architecture-dataflow.svg`) - Data movement through layers
+    9. **Architecture Interactions** (`09-architecture-interactions.svg`) - Component interactions
+
+  - **Makefile Commands** (`Makefile:129-171`):
+    - `make diagrams` - Generate all SVG files from Mermaid sources
+    - `make diagrams-validate` - Validate syntax by checking for error patterns
+    - `make diagrams-clean` - Remove generated SVG files
+    - `make diagrams-check` - Verify Docker availability
+    - Uses `minlag/mermaid-cli:11.12.0` Docker image
+
+  - **Diagram Documentation** (`docs/assets/diagrams/README.md`):
+    - Comprehensive diagram workflow guide
+    - Table of all diagrams with descriptions and types
+    - Setup instructions (Docker only, no npm)
+    - Usage examples and troubleshooting
+    - CI/CD integration examples
+
+#### Updated
+- **✅ Architecture Documentation** (`docs/naglfar-layer-architecture.md`):
+  - Replaced all inline Mermaid code blocks with SVG image references
+  - Added high-level descriptions for each diagram explaining purpose and content
+  - Maintained ASCII diagrams for universal compatibility
+  - Image paths: `![Diagram Name](assets/diagrams/XX-diagram-name.svg)`
+
+#### Fixed
+- **✅ Architecture-Beta Diagram Syntax** (`07-09-*.mmd`):
+  - **Issue**: `architecture-beta` diagrams failing with "Syntax error in text"
+  - **Root Cause**: Unsupported `<br/>` tags and special characters (`.`, `/`) in labels
+  - **Resolution**:
+    - Removed all `<br/>` tags from service labels
+    - Simplified text labels (e.g., "Traefik v3.6" → "Traefik")
+    - Removed special characters from version strings
+  - **Result**: All 9 diagrams generate successfully
+
+  - **Makefile Validation** (`Makefile:127-147`):
+    - Validates by rendering to stdout and checking for error patterns
+    - Searches output for "syntax error", "error in graph", "parse error"
+    - Displays error details if found
+    - Returns exit code 1 on validation failure
+
+#### Benefits
+- ✅ **Visual Documentation**: Architecture diagrams visualize complex system interactions
+- ✅ **Automated Workflow**: Docker-based generation - no npm dependencies
+- ✅ **Version Controlled**: Source `.mmd` files track diagram changes
+- ✅ **Regenerable**: `make diagrams` regenerates all SVGs from sources
+- ✅ **Validated**: Syntax checking prevents broken diagrams in documentation
+- ✅ **Universal Rendering**: SVG format works in all browsers, markdown renderers, PDFs
+
+#### Technical Details
+- **Mermaid CLI Version**: 11.12.0 (Docker image)
+- **Background Color**: White (configurable in Makefile)
+- **Theme**: Neutral (configurable in Makefile)
+- **Output Format**: SVG (vector graphics, scalable)
+- **Diagram Types**: Graph TB, Sequence Diagrams, Architecture-Beta
+- **Total Diagram Size**: ~280KB (all 9 SVGs combined)
+
+---
+
 ### 2025-12-27 - Traefik API Gateway Integration
 
 #### Added
@@ -954,64 +1030,9 @@ Closes #issue_number
 
 ---
 
-## File Structure Reference
+## Project Structure
 
-```
-naglfar-analytics/
-├── CHANGELOG.md                    # This file - comprehensive change history
-├── README.md                       # User-facing documentation
-├── Dockerfile                      # Multi-stage Docker build (.NET 10.0)
-├── docker-compose.yml              # Service orchestration with custom network
-├── Makefile                        # Build automation (17 commands)
-│
-├── docs/
-│   └── endpoints.md                # Quick endpoint reference
-│
-├── src/
-│   └── NaglfartAnalytics/
-│       ├── Program.cs              # Application entry point (~80 lines)
-│       │                           # - Minimal API configuration
-│       │                           # - Health check endpoints (unversioned)
-│       │                           # - Prometheus metrics endpoint
-│       │                           # - Versioned API endpoints (/api/v1/*)
-│       │                           # - Swagger setup
-│       ├── NaglfartAnalytics.csproj # .NET 10.0 project file
-│       │                           # - 6 NuGet packages
-│       ├── appsettings.json        # Production configuration
-│       ├── appsettings.Development.json # Development configuration
-│       └── Properties/
-│           └── launchSettings.json # Local development settings
-│
-├── tests/
-│   └── NaglfartAnalytics.Tests/
-│       ├── IntegrationTests.cs     # Integration tests (9 tests)
-│       │                           # - Health/readiness checks
-│       │                           # - API versioning tests
-│       ├── MetricsTests.cs         # Metrics endpoint tests (1 test)
-│       └── NaglfartAnalytics.Tests.csproj # Test project file
-│
-└── .git/                           # Version control
-```
-
-### Key Files by Purpose
-
-**Application Logic**:
-- `Program.cs` - All endpoint definitions and middleware
-
-**Configuration**:
-- `appsettings.json` - Production settings
-- `appsettings.Development.json` - Development overrides
-- `NaglfartAnalytics.csproj` - Dependencies and framework version
-
-**Infrastructure**:
-- `Dockerfile` - Container image definition
-- `docker-compose.yml` - Multi-container orchestration
-- `Makefile` - Developer command shortcuts
-
-**Documentation**:
-- `README.md` - Setup and usage guide (164 lines)
-- `CHANGELOG.md` - This file - detailed change history
-- `docs/endpoints.md` - Quick reference
+See [README.md](README.md#project-structure) for the complete project structure and file organization.
 
 ---
 

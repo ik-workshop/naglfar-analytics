@@ -1,26 +1,49 @@
 # Naglfar Analytics
 
-The ship made of dead men's nails. A bit darker, but represents collection and analysis of threat data.
+> *The ship made of dead men's nails* - A Norse mythology reference representing collection and analysis of threat data for abuse protection.
 
 ## Overview
 
-Naglfar Analytics is a .NET 8.0 web application providing health monitoring and analytics capabilities with standardized health check endpoints.
+Naglfar Analytics is an **abuse protection system** built with .NET 10.0 that acts as a defensive layer between your API gateway and backend services. It analyzes incoming requests, detects malicious patterns, and blocks abusive traffic before it reaches your core application.
+
+**Current Status**: Architecture and design phase with comprehensive documentation and diagrams.
 
 ## Features
 
-- ✅ RESTful API with minimal API design
-- ✅ Health check endpoint (`/healthz`) - Application health status
-- ✅ Readiness check endpoint (`/readyz`) - Application readiness status
+### Core Functionality
+- ✅ RESTful API with .NET 10.0 Minimal APIs
+- ✅ API Versioning (URL, query string, and header-based)
+- ✅ Health check endpoints (`/healthz`, `/readyz`) for Kubernetes
+- ✅ Prometheus metrics endpoint (`/metrics`)
 - ✅ Swagger/OpenAPI documentation
-- ✅ Docker support with multi-stage builds
-- ✅ Docker Compose orchestration
-- ✅ Makefile for easy build and deployment
+
+### Infrastructure
+- ✅ Traefik API Gateway (v3.6) integration
+- ✅ Docker support with multi-stage Alpine builds
+- ✅ Docker Compose orchestration with custom networking
+- ✅ Makefile automation (17+ commands)
+
+### Quality & Documentation
+- ✅ Comprehensive integration tests (10 tests, all passing)
+- ✅ Architecture diagrams (9 diagrams with automated generation)
+- ✅ Detailed system design and architecture documentation
+- ✅ Automated diagram validation and regeneration
+
+## Documentation
+
+📚 **Comprehensive documentation available:**
+
+- **[System Design](docs/system-design.md)** - High-level architecture and design philosophy
+- **[Naglfar Layer Architecture](docs/naglfar-layer-architecture.md)** - Detailed component architecture with diagrams
+- **[API Endpoints](docs/endpoints.md)** - Quick reference for all endpoints
+- **[Architecture Diagrams](docs/assets/diagrams/README.md)** - Diagram generation workflow and usage
+- **[CHANGELOG](CHANGELOG.md)** - Complete version history and changes
 
 ## Prerequisites
 
 - [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or later
-- [Docker](https://www.docker.com/get-started) (optional, for containerized deployment)
-- [Docker Compose](https://docs.docker.com/compose/) (optional, for orchestration)
+- [Docker](https://www.docker.com/get-started) (required for diagram generation and containerized deployment)
+- [Docker Compose](https://docs.docker.com/compose/) (for multi-service orchestration)
 
 ## Quick Start
 
@@ -54,47 +77,64 @@ The application will be available at `http://localhost:8080`
 ### Using Docker Compose
 
 ```bash
-# Start the application
-make docker-up
+# Start all services (API + Traefik)
+make compose-up
 
 # View logs
-make docker-logs
+make compose-logs
 
-# Stop the application
-make docker-down
+# Stop all services
+make compose-down
 ```
 
 ## Testing Endpoints
 
+### Direct Access (Port 8000)
 ```bash
 # Health check
-curl http://localhost:5000/healthz
+curl http://localhost:8000/healthz
 
 # Readiness check
-curl http://localhost:5000/readyz
+curl http://localhost:8000/readyz
 
-# Application info
-curl http://localhost:5000/
+# API info (versioned)
+curl http://localhost:8000/api/v1/info
+
+# Prometheus metrics
+curl http://localhost:8000/metrics
+```
+
+### Via Traefik (Port 80)
+```bash
+# Access API through Traefik
+curl -H "Host: api.local" http://localhost/healthz
+curl -H "Host: api.local" http://localhost/api/v1/info
 ```
 
 ## Makefile Commands
 
-Run `make help` to see all available commands:
+Run `make help` to see all available commands with descriptions.
 
 ### Local Development
 - `make restore` - Restore .NET dependencies
 - `make build` - Build the application
 - `make run` - Run the application locally
-- `make test` - Run tests
+- `make test` - Run all tests
+- `make test-watch` - Run tests in watch mode
+- `make test-coverage` - Run tests with code coverage
 - `make clean` - Clean build artifacts
 
-### Docker Commands
-- `make docker-build` - Build Docker image
-- `make docker-run` - Run application in Docker
-- `make docker-stop` - Stop Docker containers
-- `make docker-clean` - Remove Docker images and containers
-- `make docker-up` - Build and run with docker-compose
-- `make docker-down` - Stop and remove docker-compose containers
+### Docker Compose
+- `make compose-up` - Start all services with docker-compose
+- `make compose-down` - Stop and remove all services
+- `make compose-logs` - Show logs for all services
+- `make api-rebuild` - Rebuild only the API service
+
+### Diagram Generation
+- `make diagrams` - Generate all SVG diagrams from Mermaid sources
+- `make diagrams-validate` - Validate all diagram syntax
+- `make diagrams-clean` - Remove generated SVG files
+- `make diagrams-check` - Check if Docker is available
 
 ## Project Structure
 
@@ -102,29 +142,50 @@ Run `make help` to see all available commands:
 naglfar-analytics/
 ├── src/
 │   └── NaglfartAnalytics/
-│       ├── Program.cs              # Application entry point and endpoints
-│       ├── NaglfartAnalytics.csproj # Project configuration
-│       ├── appsettings.json        # Application settings
-│       └── appsettings.Development.json
-├── Dockerfile                       # Docker configuration
-├── docker-compose.yml              # Docker Compose configuration
-├── Makefile                        # Build automation
-├── CHANGELOG.md                    # Version history
-└── README.md                       # This file
+│       ├── Program.cs                      # Application entry point
+│       │                                   # - API versioning & endpoints
+│       │                                   # - Health checks & metrics
+│       │                                   # - Swagger configuration
+│       ├── NaglfartAnalytics.csproj        # .NET 10.0 project file
+│       ├── appsettings.json                # Production configuration
+│       └── appsettings.Development.json    # Development configuration
+│
+├── tests/
+│   └── NaglfartAnalytics.Tests/
+│       ├── IntegrationTests.cs             # Integration tests (9 tests)
+│       ├── MetricsTests.cs                 # Metrics endpoint tests (1 test)
+│       └── NaglfartAnalytics.Tests.csproj  # Test project file
+│
+├── docs/
+│   ├── system-design.md                    # High-level system architecture
+│   ├── naglfar-layer-architecture.md       # Detailed component architecture
+│   ├── endpoints.md                        # API endpoint reference
+│   └── assets/
+│       └── diagrams/
+│           ├── README.md                   # Diagram workflow documentation
+│           ├── *.mmd                       # Mermaid source files (9 diagrams)
+│           └── *.svg                       # Generated SVG diagrams
+│
+├── Dockerfile                              # Multi-stage Docker build (Alpine)
+├── docker-compose.yml                      # Service orchestration (API + Traefik)
+├── Makefile                                # Build automation (17+ commands)
+├── CHANGELOG.md                            # Complete version history
+└── README.md                               # This file
 ```
 
 ## Development
 
-The application uses .NET 8.0 minimal APIs for a lightweight and performant web service.
+The application uses .NET 10.0 Minimal APIs for a lightweight and performant web service with API versioning.
 
 ### Adding New Endpoints
 
-Edit `src/NaglfartAnalytics/Program.cs` to add new endpoints:
+Edit `src/NaglfartAnalytics/Program.cs` to add new versioned endpoints:
 
 ```csharp
-app.MapGet("/your-endpoint", () => Results.Ok(new { message = "Hello" }))
+// Add to v1 API group
+v1Group.MapGet("/your-endpoint", () => Results.Ok(new { message = "Hello" }))
     .WithName("YourEndpoint")
-    .WithOpenApi();
+    .WithDescription("Your endpoint description");
 ```
 
 ### Configuration
@@ -154,6 +215,7 @@ These endpoints are commonly used by:
 - [Traefik Examples](https://github.com/ik-infrastructure-testing/traefik-examples-fork)
 - [Traefik Routes](https://doc.traefik.io/traefik/reference/routing-configuration/http/routing/rules-and-priority/#rule)
 - [Mermaid diagrams cli](https://github.com/mermaid-js/mermaid-cli)
+- [Diagrams as code](https://diagrams.mingrammer.com/docs/nodes/custom)
 
 ## License
 
