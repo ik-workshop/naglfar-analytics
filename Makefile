@@ -4,57 +4,57 @@ help: Makefile
 	@sed -n 's/^#?//p' $< | column -t -s ':' |  sort | sed -e 's/^/ /'
 
 # Local build without Docker
-#? restore: Restore .NET dependencies
+#? restore: Restore .NET dependencies for all services
 restore:
 	@echo "Restoring .NET dependencies..."
-	dotnet restore src/NaglfartAnalytics/NaglfartAnalytics.csproj
-	dotnet restore tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj
+	dotnet restore services/naglfar-validation/src/NaglfartAnalytics/NaglfartAnalytics.csproj
+	dotnet restore services/naglfar-validation/tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj
 
-#? build: Build the application
+#? build: Build all .NET services
 build: restore
-	@echo "Building the application..."
-	dotnet build src/NaglfartAnalytics/NaglfartAnalytics.csproj -c Release
-	dotnet build tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj -c Release
+	@echo "Building all services..."
+	dotnet build services/naglfar-validation/src/NaglfartAnalytics/NaglfartAnalytics.csproj -c Release
+	dotnet build services/naglfar-validation/tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj -c Release
 
-#? run: Run the application locally
+#? run: Run naglfar-validation service locally
 run:
-	@echo "Running the application..."
-	@echo "Application will be available at: http://localhost:5000"
-	@echo "Health check: http://localhost:5000/healthz"
-	@echo "Readiness check: http://localhost:5000/readyz"
-	dotnet run --project src/NaglfartAnalytics/NaglfartAnalytics.csproj --urls "http://localhost:8080"
+	@echo "Running naglfar-validation service..."
+	@echo "Application will be available at: http://localhost:8000"
+	@echo "Health check: http://localhost:8000/healthz"
+	@echo "Readiness check: http://localhost:8000/readyz"
+	dotnet run --project services/naglfar-validation/src/NaglfartAnalytics/NaglfartAnalytics.csproj --urls "http://localhost:8000"
 
 #? test: Run all tests
 test:
-	@echo "Running tests..."
-	dotnet test tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj
+	@echo "Running tests for all services..."
+	dotnet test services/naglfar-validation/tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj
 
 #? test-watch: Run tests in watch mode
 test-watch:
 	@echo "Running tests in watch mode..."
 	@echo "Press Ctrl+C to stop"
-	dotnet watch test --project tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj
+	dotnet watch test --project services/naglfar-validation/tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj
 
 #? test-coverage: Run tests with code coverage
 test-coverage:
 	@echo "Running tests with code coverage..."
-	dotnet test tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj \
+	dotnet test services/naglfar-validation/tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj \
 		--collect:"XPlat Code Coverage" \
 		--results-directory ./coverage
 
 #? test-verbose: Run tests with verbose output
 test-verbose:
 	@echo "Running tests with verbose output..."
-	dotnet test tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj \
+	dotnet test services/naglfar-validation/tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj \
 		--verbosity detailed
 
 #? clean: Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	dotnet clean src/NaglfartAnalytics/NaglfartAnalytics.csproj
-	dotnet clean tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj
-	rm -rf src/NaglfartAnalytics/bin src/NaglfartAnalytics/obj
-	rm -rf tests/NaglfartAnalytics.Tests/bin tests/NaglfartAnalytics.Tests/obj
+	dotnet clean services/naglfar-validation/src/NaglfartAnalytics/NaglfartAnalytics.csproj
+	dotnet clean services/naglfar-validation/tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj
+	rm -rf services/naglfar-validation/src/NaglfartAnalytics/bin services/naglfar-validation/src/NaglfartAnalytics/obj
+	rm -rf services/naglfar-validation/tests/NaglfartAnalytics.Tests/bin services/naglfar-validation/tests/NaglfartAnalytics.Tests/obj
 	rm -rf coverage
 
 # Docker commands
@@ -87,25 +87,25 @@ compose-up:
 	@echo "Application will be available at: http://localhost:8080"
 	@echo "Health check: http://localhost:8080/healthz"
 	@echo "Readiness check: http://localhost:8080/readyz"
-	docker-compose up --build
+	docker-compose -f infrastructure/docker-compose.yml up --build
 
 #? compose-down: Stop and remove docker-compose containers
 compose-down:
 	@echo "Stopping docker-compose services..."
-	docker-compose down
+	docker-compose -f infrastructure/docker-compose.yml down
 
 #? compose-logs: show logs for docker-compose containers
 compose-logs:
 	@echo "Showing docker-compose logs..."
-	docker-compose logs -f
+	docker-compose -f infrastructure/docker-compose.yml logs -f
 
-#? api-rebuild: rebuild api
-api-rebuild:
-	@docker compose -f docker-compose.yml up -d --build api
+#? validation-rebuild: rebuild naglfar-validation service
+validation-rebuild:
+	@docker compose -f infrastructure/docker-compose.yml up -d --build naglfar-validation
 
 #? apigw-restart: rebuild and restart traefik
 apigw-restart:
-	@docker compose -f docker-compose.yml up -d --build api-gateway
+	@docker compose -f infrastructure/docker-compose.yml up -d --build api-gateway
 
 # Diagram commands
 DIAGRAMS_DIR := docs/assets/diagrams

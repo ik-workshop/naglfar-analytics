@@ -6,7 +6,9 @@
 
 Naglfar Analytics is an **abuse protection system** built with .NET 10.0 that acts as a defensive layer between your API gateway and backend services. It analyzes incoming requests, detects malicious patterns, and blocks abusive traffic before it reaches your core application.
 
-**Current Status**: Architecture and design phase with comprehensive documentation and diagrams.
+**Current Status**: Monorepo structure established. Architecture and design phase with comprehensive documentation and diagrams.
+
+**Repository Structure**: This is a monorepo containing multiple microservices including the naglfar-validation service (.NET 10.0), with planned additions for worker services, authentication, and protected demo applications.
 
 ## Features
 
@@ -128,7 +130,8 @@ Run `make help` to see all available commands with descriptions.
 - `make compose-up` - Start all services with docker-compose
 - `make compose-down` - Stop and remove all services
 - `make compose-logs` - Show logs for all services
-- `make api-rebuild` - Rebuild only the API service
+- `make validation-rebuild` - Rebuild only the naglfar-validation service
+- `make apigw-restart` - Rebuild and restart Traefik API Gateway
 
 ### Diagram Generation
 - `make diagrams` - Generate all SVG diagrams from Mermaid sources
@@ -139,22 +142,39 @@ Run `make help` to see all available commands with descriptions.
 ## Project Structure
 
 ```
-naglfar-analytics/
-├── src/
-│   └── NaglfartAnalytics/
-│       ├── Program.cs                      # Application entry point
-│       │                                   # - API versioning & endpoints
-│       │                                   # - Health checks & metrics
-│       │                                   # - Swagger configuration
-│       ├── NaglfartAnalytics.csproj        # .NET 10.0 project file
-│       ├── appsettings.json                # Production configuration
-│       └── appsettings.Development.json    # Development configuration
+naglfar-analytics/                          # Monorepo root
+├── services/                               # Microservices directory
+│   └── naglfar-validation/                 # Validation service (.NET 10.0)
+│       ├── src/
+│       │   └── NaglfartAnalytics/
+│       │       ├── Program.cs              # Application entry point
+│       │       ├── NaglfartAnalytics.csproj # .NET 10.0 project file
+│       │       ├── appsettings.json        # Production configuration
+│       │       └── appsettings.Development.json # Development configuration
+│       ├── tests/
+│       │   └── NaglfartAnalytics.Tests/
+│       │       ├── IntegrationTests.cs     # Integration tests (9 tests)
+│       │       ├── MetricsTests.cs         # Metrics endpoint tests (1 test)
+│       │       └── NaglfartAnalytics.Tests.csproj # Test project file
+│       └── Dockerfile                      # Multi-stage Docker build (Alpine)
 │
-├── tests/
-│   └── NaglfartAnalytics.Tests/
-│       ├── IntegrationTests.cs             # Integration tests (9 tests)
-│       ├── MetricsTests.cs                 # Metrics endpoint tests (1 test)
-│       └── NaglfartAnalytics.Tests.csproj  # Test project file
+├── infrastructure/                         # Infrastructure configuration
+│   ├── docker-compose.yml                  # Service orchestration (API + Traefik)
+│   ├── traefik/                            # API Gateway configuration (future)
+│   ├── kafka/                              # Message broker configuration (future)
+│   ├── neo4j/                              # Graph database configuration (future)
+│   └── prometheus/                         # Monitoring configuration (future)
+│
+├── shared/                                 # Shared libraries (future)
+│   ├── dotnet/                             # Shared .NET libraries
+│   └── python/                             # Shared Python libraries
+│
+├── tests/                                  # Cross-service tests (future)
+│   ├── integration/                        # Integration tests
+│   └── e2e/                                # End-to-end tests
+│
+├── scripts/                                # Automation scripts (future)
+│   └── ...
 │
 ├── docs/
 │   ├── system-design.md                    # High-level system architecture
@@ -166,8 +186,6 @@ naglfar-analytics/
 │           ├── *.mmd                       # Mermaid source files (9 diagrams)
 │           └── *.svg                       # Generated SVG diagrams
 │
-├── Dockerfile                              # Multi-stage Docker build (Alpine)
-├── docker-compose.yml                      # Service orchestration (API + Traefik)
 ├── Makefile                                # Build automation (17+ commands)
 ├── CHANGELOG.md                            # Complete version history
 └── README.md                               # This file
@@ -179,7 +197,7 @@ The application uses .NET 10.0 Minimal APIs for a lightweight and performant web
 
 ### Adding New Endpoints
 
-Edit `src/NaglfartAnalytics/Program.cs` to add new versioned endpoints:
+Edit `services/naglfar-validation/src/NaglfartAnalytics/Program.cs` to add new versioned endpoints:
 
 ```csharp
 // Add to v1 API group

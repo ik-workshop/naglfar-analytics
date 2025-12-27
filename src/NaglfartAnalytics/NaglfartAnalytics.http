@@ -1,6 +1,0 @@
-@NaglfartAnalytics_HostAddress = http://localhost:5218
-
-GET {{NaglfartAnalytics_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

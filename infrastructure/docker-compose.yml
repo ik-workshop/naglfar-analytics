@@ -23,11 +23,11 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
 
-  api:
+  naglfar-validation:
     build:
-      context: .
+      context: ../services/naglfar-validation
       dockerfile: Dockerfile
-    container_name: api
+    container_name: naglfar-validation
     ports:
       - "8000:8000"
     environment:

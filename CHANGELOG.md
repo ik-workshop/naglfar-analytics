@@ -91,6 +91,45 @@ A lightweight .NET web application providing **health monitoring and analytics c
 
 ## Changelog
 
+### 2025-12-27 - Monorepo Restructuring
+
+#### Changed
+- **✅ Repository Structure - Monorepo Transformation**:
+  - **Restructured to monorepo** to support multiple microservices:
+    - `services/` - Microservices directory
+    - `infrastructure/` - Docker Compose, configuration files
+    - `shared/` - Shared libraries (dotnet/, python/)
+    - `tests/` - Cross-service integration/e2e tests
+    - `scripts/` - Automation scripts
+
+  - **Service Migration** - Moved naglfar-validation service:
+    - `src/` → `services/naglfar-validation/src/`
+    - `tests/` → `services/naglfar-validation/tests/`
+    - `Dockerfile` → `services/naglfar-validation/Dockerfile`
+
+  - **Infrastructure Reorganization**:
+    - `docker-compose.yml` → `infrastructure/docker-compose.yml`
+    - Created placeholder directories: `traefik/`, `kafka/`, `neo4j/`, `prometheus/`
+
+  - **Build Configuration Updates** (`Makefile:1-155`):
+    - Updated all service paths to reference `services/naglfar-validation/`
+    - Updated Docker Compose commands to use `infrastructure/docker-compose.yml`
+    - Renamed `api-rebuild` → `validation-rebuild`
+    - Added `apigw-restart` for Traefik gateway management
+
+  - **Documentation Updates** (`README.md`):
+    - Updated project structure diagram showing monorepo layout
+    - Added monorepo description to Overview section
+    - Updated all path references in development guides
+    - Updated Makefile commands documentation
+
+#### Planned Services
+- **naglfar-validation** (.NET 10.0) - Request validation service ✅ Exists
+- **naglfar-worker** (.NET) - Kafka consumer → Neo4j writer (planned)
+- **naglfar-analytics-worker** (.NET) - Scheduled analytics: Neo4j → Redis (planned)
+- **auth-service** (Python FastAPI) - 3rd party authentication (planned)
+- **bookstore** (Python FastAPI) - Protected demo application (planned)
+
 ### 2025-12-27 - Architecture Diagrams & Documentation
 
 #### Added

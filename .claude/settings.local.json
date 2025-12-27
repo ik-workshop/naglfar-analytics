@@ -16,7 +16,8 @@
       "Bash(make diagrams-check:*)",
       "Bash(docker --version:*)",
       "Bash(ls:*)",
-      "Bash(make diagrams-validate:*)"
+      "Bash(make diagrams-validate:*)",
+      "Bash(make help:*)"
     ]
   }
 }
