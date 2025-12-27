@@ -1,11 +1,21 @@
-.PHONY: help
-#? help: Get more info on available commands
-help: Makefile
-	@sed -n 's/^#?//p' $< | column -t -s ':' |  sort | sed -e 's/^/ /'
 
-# Local build without Docker
-#? restore: Restore .NET dependencies for all services
-restore:
+MAKEFLAGS += --warn-undefined-variables
+MAKEFLAGS += --no-builtin-rules
+
+DIAGRAMS_DIR := docs/assets/diagrams
+DIAGRAMS_SRC := $(wildcard $(DIAGRAMS_DIR)/*.mmd)
+DIAGRAMS_SVG := $(DIAGRAMS_SRC:.mmd=.svg)
+MERMAID_CLI_VERSION := 11.12.0
+MERMAID_CLI_IMAGE := minlag/mermaid-cli:$(MERMAID_CLI_VERSION)
+
+.PHONY: help
+help:
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+-include services/book-store/helpers.mk
+-include services/naglfar-validation/helpers.mk
+
+restore: ## Restore .NET dependencies for all services
 	@echo "Restoring .NET dependencies..."
 	dotnet restore services/naglfar-validation/src/NaglfartAnalytics/NaglfartAnalytics.csproj
 	dotnet restore services/naglfar-validation/tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj
@@ -48,38 +58,13 @@ test-verbose:
 	dotnet test services/naglfar-validation/tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj \
 		--verbosity detailed
 
-#? clean: Clean build artifacts
-clean:
+clean: ## Clean build artifacts
 	@echo "Cleaning build artifacts..."
 	dotnet clean services/naglfar-validation/src/NaglfartAnalytics/NaglfartAnalytics.csproj
 	dotnet clean services/naglfar-validation/tests/NaglfartAnalytics.Tests/NaglfartAnalytics.Tests.csproj
 	rm -rf services/naglfar-validation/src/NaglfartAnalytics/bin services/naglfar-validation/src/NaglfartAnalytics/obj
 	rm -rf services/naglfar-validation/tests/NaglfartAnalytics.Tests/bin services/naglfar-validation/tests/NaglfartAnalytics.Tests/obj
 	rm -rf coverage
-
-# Docker commands
-docker-build:
-	@echo "Building Docker image..."
-	docker build -t naglfar-analytics:latest .
-
-docker-run:
-	@echo "Running Docker container..."
-	@echo "Application will be available at: http://localhost:8080"
-	@echo "Health check: http://localhost:8080/healthz"
-	@echo "Readiness check: http://localhost:8080/readyz"
-	docker run -d --name naglfar-analytics -p 8080:8080 -p 8081:8081 \
-		-e ASPNETCORE_ENVIRONMENT=Production \
-		-e ASPNETCORE_URLS=http://+:8080 \
-		naglfar-analytics:latest
-
-docker-stop:
-	@echo "Stopping Docker container..."
-	docker stop naglfar-analytics || true
-	docker rm naglfar-analytics || true
-
-docker-clean: docker-stop
-	@echo "Removing Docker image..."
-	docker rmi naglfar-analytics:latest || true
 
 #? compose-up: Build and run with docker-compose
 compose-up:
@@ -107,15 +92,7 @@ validation-rebuild:
 apigw-restart:
 	@docker compose -f infrastructure/docker-compose.yml up -d --build api-gateway
 
-# Diagram commands
-DIAGRAMS_DIR := docs/assets/diagrams
-DIAGRAMS_SRC := $(wildcard $(DIAGRAMS_DIR)/*.mmd)
-DIAGRAMS_SVG := $(DIAGRAMS_SRC:.mmd=.svg)
-MERMAID_CLI_VERSION := 11.12.0
-MERMAID_CLI_IMAGE := minlag/mermaid-cli:$(MERMAID_CLI_VERSION)
-
-#? diagrams: Generate SVG images from Mermaid diagrams
-diagrams: $(DIAGRAMS_SVG)
+diagrams: $(DIAGRAMS_SVG) ## Generate SVG images from Mermaid diagrams
 	@echo "✓ All diagrams generated successfully!"
 	@echo "  Generated $(words $(DIAGRAMS_SVG)) SVG files in $(DIAGRAMS_DIR)/"
 
@@ -124,8 +101,7 @@ $(DIAGRAMS_DIR)/%.svg: $(DIAGRAMS_DIR)/%.mmd
 	@docker run --rm -v $(PWD):/data $(MERMAID_CLI_IMAGE) \
 		-i /data/$< -o /data/$@ -b white -t neutral
 
-#? diagrams-validate: Validate Mermaid diagrams by checking for syntax errors
-diagrams-validate:
+diagrams-validate: ## Validate Mermaid diagrams by checking for syntax errors
 	@echo "Validating Mermaid diagrams..."
 	@failed=0; \
 	for file in $(DIAGRAMS_SRC); do \
@@ -147,8 +123,7 @@ diagrams-validate:
 		exit 1; \
 	fi
 
-#? diagrams-clean: Remove generated SVG files
-diagrams-clean:
+diagrams-clean: ## Remove generated SVG files
 	@echo "Cleaning generated SVG files..."
 	@rm -f $(DIAGRAMS_DIR)/*.svg
 	@echo "✓ Cleaned $(DIAGRAMS_DIR)/"
