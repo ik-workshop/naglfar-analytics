@@ -37,6 +37,10 @@ builder.Services.AddSwaggerGen(options =>
 // Add health checks
 builder.Services.AddHealthChecks();
 
+// Add YARP reverse proxy
+builder.Services.AddReverseProxy()
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+
 var app = builder.Build();
 
 
@@ -78,6 +82,9 @@ v1Group.MapGet("/info", () => Results.Ok(new {
 .WithName("GetApplicationInfo")
 .WithSummary("Get application information")
 .WithDescription("Returns application metadata including name, description, and version");
+
+// Map YARP reverse proxy
+app.MapReverseProxy();
 
 app.Run();
 

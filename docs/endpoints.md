@@ -23,6 +23,56 @@ curl -H "Host: api.local" http://localhost/api/v1/info
 
 ## Book Store Endpoints
 
+**Access Methods:**
+1. **Via API Gateway (api.local)** - YARP reverse proxy through naglfar-validation service (Recommended)
+2. **Via Direct Traefik (book-store-eu.local)** - Direct routing to book-store service
+3. **Direct Access** - Port 8081 (container port 8000)
+
+### Quick Reference - API Gateway Access (Recommended)
+
+All book-store endpoints are accessible through the API gateway at `api.local`:
+
+```sh
+# Books
+curl -H "Host: api.local" http://localhost/api/v1/books
+curl -H "Host: api.local" "http://localhost/api/v1/books?category=programming"
+curl -H "Host: api.local" http://localhost/api/v1/books/1
+
+# Inventory
+curl -H "Host: api.local" http://localhost/api/v1/inventory
+curl -H "Host: api.local" "http://localhost/api/v1/inventory?book_id=1"
+
+# Authentication
+curl -X POST -H "Host: api.local" http://localhost/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "password123"}'
+
+curl -X POST -H "Host: api.local" http://localhost/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password123"}'
+
+# Cart (requires authentication)
+TOKEN="your-token-here"
+curl -H "Host: api.local" -H "Authorization: Bearer $TOKEN" http://localhost/api/v1/cart
+
+curl -X POST -H "Host: api.local" -H "Authorization: Bearer $TOKEN" \
+  http://localhost/api/v1/cart/items \
+  -H "Content-Type: application/json" \
+  -d '{"book_id": 1, "quantity": 2}'
+
+# Orders (requires authentication)
+curl -X POST -H "Host: api.local" -H "Authorization: Bearer $TOKEN" \
+  http://localhost/api/v1/checkout \
+  -H "Content-Type: application/json" \
+  -d '{"payment_method": "card_ending_1234"}'
+
+curl -H "Host: api.local" -H "Authorization: Bearer $TOKEN" \
+  http://localhost/api/v1/orders
+
+curl -H "Host: api.local" -H "Authorization: Bearer $TOKEN" \
+  http://localhost/api/v1/orders/1
+```
+
 ### Health and Infrastructure
 
 **Direct Access (Port 8090):**
@@ -43,9 +93,17 @@ curl -H "Host: book-store-eu.local" http://localhost/docs
 
 ### Books Endpoints
 
+**Via API Gateway (api.local) - Recommended:**
+```sh
+curl -H "Host: api.local" http://localhost/api/v1/books
+curl -H "Host: api.local" "http://localhost/api/v1/books?category=programming"
+curl -H "Host: api.local" "http://localhost/api/v1/books?search=Clean"
+curl -H "Host: api.local" http://localhost/api/v1/books/1
+```
+
 **List all books (Direct):**
 ```sh
-curl http://localhost:8090/api/v1/books
+curl http://localhost:8081/api/v1/books
 ```
 
 **List books by category (Direct):**

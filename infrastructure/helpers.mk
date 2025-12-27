@@ -16,8 +16,5 @@ compose-logs: ## Stop and remove docker-compose containers
 	@echo "Showing docker-compose logs..."
 	docker-compose -f $(INFRASTRUCTURE_DIR)/docker-compose.yml logs -f
 
-validation-rebuild: ## Rebuild and restart naglfar-validation service
-	@docker compose -f $(INFRASTRUCTURE_DIR)/docker-compose.yml up -d --build naglfar-validation
-
 apigw-restart: ## Rebuild and restart API Gateway (Traefik) service
 	@docker compose -f $(INFRASTRUCTURE_DIR)/docker-compose.yml up -d --build api-gateway

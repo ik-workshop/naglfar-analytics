@@ -1,6 +1,9 @@
 # Determine the directory of this helper makefile
 NAGLFAR_VALIDATION_DIR := services/naglfar-validation
 
+validation-rebuild: ## Rebuild and restart naglfar-validation service
+	@docker compose -f infrastructure/docker-compose.yml up -d --build naglfar-validation
+
 docker-build-naglfar: ## Build Docker image for naglfar-analytics service
 	@echo "Building Docker image..."
 	docker build -t naglfar-analytics:latest $(NAGLFAR_VALIDATION_DIR)
