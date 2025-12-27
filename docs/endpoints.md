@@ -52,6 +52,7 @@ RETURN_URL="http://localhost:8000/api/v1/store-1/books"
 curl -v "http://localhost:8082/api/v1/auth/?e_token=${E_TOKEN}&return_url=${RETURN_URL}"
 # Returns: 302 Redirect to return_url
 # Header: AUTH-TOKEN: eyJzdG9yZV9pZCI6InN0b3JlLTEiLCJ1c2VyX2lkIjoxLCJleHBpcmVkX2F0IjoiMjAyNS0xMi0yN1QxNjo...
+# Header: AUTH-TOKEN-ID: a1b2c3d4e5f6... (SHA256 hash for tracking)
 ```
 
 **Via Traefik:**
@@ -83,6 +84,100 @@ AUTH-TOKEN is base64-encoded JSON with HMAC-SHA256 signature:
   "signature": "a1b2c3d4e5f6..."              // HMAC-SHA256 using SIGNATURE_KEY
 }
 ```
+
+**AUTH-TOKEN-ID:**
+The auth-service also returns an `AUTH-TOKEN-ID` header, which is the SHA256 hash of the AUTH-TOKEN. This ID is used for:
+- **Tracking**: Log token usage without exposing the actual token
+- **Analytics**: Track token lifecycle (generation, usage, expiration)
+- **Debugging**: Correlate requests using the same token
+- **Security**: Detect token reuse or replay attacks
+
+Example:
+```
+AUTH-TOKEN: eyJzdG9yZV9pZCI6InN0b3JlLTEiLCJ1c2VyX2lkIjoxLCJleHBpcmVkX2F0Ijoi...
+AUTH-TOKEN-ID: a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890
+```
+
+### Manual Token Generation
+
+#### Generate E-TOKEN Manually
+
+E-TOKEN is base64-encoded JSON with expiry and store_id:
+
+```bash
+# Set expiry (15 minutes from now) and store_id
+EXPIRY_DATE=$(date -u -v+15M +"%Y-%m-%dT%H:%M:%S.000Z")  # macOS
+# EXPIRY_DATE=$(date -u -d "+15 minutes" +"%Y-%m-%dT%H:%M:%S.000Z")  # Linux
+STORE_ID="store-1"
+
+# Create JSON and encode to base64
+E_TOKEN=$(echo -n "{\"expiry_date\":\"${EXPIRY_DATE}\",\"store_id\":\"${STORE_ID}\"}" | base64)
+
+echo "E-TOKEN: ${E_TOKEN}"
+
+# Use in redirect URL
+RETURN_URL="http://localhost:8000/api/v1/store-1/books"
+echo "Redirect URL: http://localhost:8082/api/v1/auth/?e_token=${E_TOKEN}&return_url=${RETURN_URL}"
+```
+
+#### Generate AUTH-TOKEN Manually
+
+AUTH-TOKEN requires HMAC-SHA256 signature using the shared SIGNATURE_KEY:
+
+```bash
+# Configuration
+STORE_ID="store-1"
+USER_ID=1
+SIGNATURE_KEY="your-shared-secret-key-here"  # Must match auth-service and naglfar-validation
+
+# Calculate expiry (5 minutes from now)
+EXPIRED_AT=$(date -u -v+5M +"%Y-%m-%dT%H:%M:%S.000Z")  # macOS
+# EXPIRED_AT=$(date -u -d "+5 minutes" +"%Y-%m-%dT%H:%M:%S.000Z")  # Linux
+
+# Create message for signing (JSON with sorted keys, snake_case)
+MESSAGE="{\"expired_at\":\"${EXPIRED_AT}\",\"store_id\":\"${STORE_ID}\",\"user_id\":${USER_ID}}"
+
+# Compute HMAC-SHA256 signature (lowercase hex)
+SIGNATURE=$(echo -n "${MESSAGE}" | openssl dgst -sha256 -hmac "${SIGNATURE_KEY}" | awk '{print $2}')
+
+# Create complete token JSON with signature
+TOKEN_JSON="{\"store_id\":\"${STORE_ID}\",\"user_id\":${USER_ID},\"expired_at\":\"${EXPIRED_AT}\",\"signature\":\"${SIGNATURE}\"}"
+
+# Base64 encode
+AUTH_TOKEN=$(echo -n "${TOKEN_JSON}" | base64)
+
+# Compute AUTH-TOKEN-ID (SHA256 hash of the token)
+AUTH_TOKEN_ID=$(echo -n "${AUTH_TOKEN}" | openssl dgst -sha256 | awk '{print $2}')
+
+echo "AUTH-TOKEN: ${AUTH_TOKEN}"
+echo "AUTH-TOKEN-ID: ${AUTH_TOKEN_ID}"
+
+# Test with curl
+echo ""
+echo "Test command:"
+echo "curl -H \"Host: api.local\" -H \"AUTH-TOKEN: ${AUTH_TOKEN}\" http://localhost/api/v1/store-1/books"
+```
+
+**Verification Script** (decode AUTH-TOKEN to verify):
+```bash
+# Decode AUTH-TOKEN to verify contents
+echo "${AUTH_TOKEN}" | base64 -d | jq .
+
+# Expected output:
+# {
+#   "store_id": "store-1",
+#   "user_id": 1,
+#   "expired_at": "2025-12-27T16:00:00.000Z",
+#   "signature": "a1b2c3d4e5f67890..."
+# }
+```
+
+**Notes:**
+- **macOS**: Use `date -u -v+15M` for date arithmetic
+- **Linux**: Use `date -u -d "+15 minutes"` for date arithmetic
+- **SIGNATURE_KEY**: Must match the key configured in both auth-service and naglfar-validation
+- **Message Format**: Critical - must be sorted keys with snake_case: `{"expired_at":"...","store_id":"...","user_id":123}`
+- **Signature**: Must be lowercase hexadecimal (openssl dgst output is already lowercase)
 
 ### Manual Registration/Login Endpoints
 
@@ -152,6 +247,7 @@ curl -v -H "Host: api.local" http://localhost/api/v1/store-1/books
 # Step 3: Auth-service redirects back with AUTH-TOKEN
 # Location: http://localhost:8000/api/v1/store-1/books
 # Header: AUTH-TOKEN: eyJ...
+# Header: AUTH-TOKEN-ID: a1b2c3d4e5f6... (SHA256 hash)
 
 # Step 4: Access protected endpoint with AUTH-TOKEN
 AUTH_TOKEN="eyJzdG9yZV9pZCI6InN0b3JlLTEiLCJ1c2VyX2lkIjoxLCJleHBpcmVkX2F0IjoiMjAyNS0xMi0yN1QxNjowMDowMC4wMDBaIiwic2lnbmF0dXJlIjoiYTFiMmMzZDRlNWY2In0="

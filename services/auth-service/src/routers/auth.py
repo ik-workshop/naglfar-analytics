@@ -138,9 +138,13 @@ async def auth_page(
     # Generate AUTH-TOKEN
     auth_token = create_auth_token(store_id, test_user["id"])
 
+    # Compute AUTH-TOKEN-ID (SHA256 hash for tracking)
+    auth_token_id = hashlib.sha256(auth_token.encode('utf-8')).hexdigest()
+
     # Create redirect response with AUTH-TOKEN header
     response = RedirectResponse(url=return_url, status_code=status.HTTP_302_FOUND)
     response.headers["AUTH-TOKEN"] = auth_token
+    response.headers["AUTH-TOKEN-ID"] = auth_token_id
 
     return response
 
@@ -171,7 +175,10 @@ async def authorize(
     # Create AUTH-TOKEN
     auth_token = create_auth_token(store_id, user["id"])
 
-    return Token(access_token=auth_token, user_id=user["id"])
+    # Compute AUTH-TOKEN-ID (SHA256 hash for tracking)
+    auth_token_id = hashlib.sha256(auth_token.encode('utf-8')).hexdigest()
+
+    return Token(access_token=auth_token, access_token_id=auth_token_id, user_id=user["id"])
 
 
 @router.post("/login", response_model=Token)
@@ -197,4 +204,7 @@ async def login(
     # Create AUTH-TOKEN
     auth_token = create_auth_token(store_id, user["id"])
 
-    return Token(access_token=auth_token, user_id=user["id"])
+    # Compute AUTH-TOKEN-ID (SHA256 hash for tracking)
+    auth_token_id = hashlib.sha256(auth_token.encode('utf-8')).hexdigest()
+
+    return Token(access_token=auth_token, access_token_id=auth_token_id, user_id=user["id"])

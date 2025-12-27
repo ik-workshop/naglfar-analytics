@@ -198,7 +198,9 @@ Currently uses a simple in-memory database (`storage/database.py`):
 ```python
 {
   "access_token": "base64_encoded_auth_token_string",
-  "user_id": 123
+  "access_token_id": "sha256_hash_of_access_token",  # For tracking/logging
+  "user_id": 123,
+  "token_type": "bearer"
 }
 ```
 

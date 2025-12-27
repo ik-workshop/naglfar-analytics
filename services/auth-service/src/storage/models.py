@@ -17,5 +17,6 @@ class UserLogin(BaseModel):
 class Token(BaseModel):
     """Authentication token response"""
     access_token: str
+    access_token_id: str  # SHA256 hash of access_token for tracking
     user_id: int
     token_type: str = "bearer"

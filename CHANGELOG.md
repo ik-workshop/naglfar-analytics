@@ -91,6 +91,83 @@ A lightweight .NET web application providing **health monitoring and analytics c
 
 ## Changelog
 
+### 2025-12-27 - AUTH-TOKEN-ID Tracking & Manual Token Generation
+
+#### Added
+- **✅ AUTH-TOKEN-ID Header** (`services/auth-service/src/routers/auth.py`):
+  - **SHA256 Hash**: AUTH-TOKEN-ID is the SHA256 hash of the AUTH-TOKEN
+  - **Purpose**: Enables tracking and analytics without exposing actual tokens in logs
+  - **Redirect Response** (`auth_page` endpoint, lines 141-147):
+    - Computes `auth_token_id = hashlib.sha256(auth_token.encode('utf-8')).hexdigest()`
+    - Sets `AUTH-TOKEN-ID` header in 302 redirect response
+  - **Registration Response** (`authorize` endpoint, lines 178-181):
+    - Computes `auth_token_id` and includes in JSON response
+  - **Login Response** (`login` endpoint, lines 207-210):
+    - Computes `auth_token_id` and includes in JSON response
+
+- **✅ Updated Token Model** (`services/auth-service/src/storage/models.py:20`):
+  - Added `access_token_id: str` field to Token response model
+  - Comment: "SHA256 hash of access_token for tracking"
+
+- **✅ Manual Token Generation Guide** (`docs/endpoints.md`):
+  - **E-TOKEN Generation Script**:
+    - Bash command to create base64-encoded JSON with expiry and store_id
+    - Automatic expiry calculation (15 minutes from now)
+    - Platform-specific date commands (macOS/Linux)
+  - **AUTH-TOKEN Generation Script**:
+    - Complete workflow: calculate expiry, create message, compute HMAC-SHA256
+    - Critical message format: sorted keys with snake_case
+    - OpenSSL HMAC signature computation
+    - AUTH-TOKEN-ID calculation (SHA256 hash)
+    - Ready-to-use curl test command
+  - **Verification Script**: Decode and inspect tokens with jq
+
+#### Changed
+- **✅ API Responses Include AUTH-TOKEN-ID**:
+  - **Redirect Response** (GET `/api/v1/auth/`):
+    ```
+    302 Found
+    Location: http://localhost:8000/api/v1/store-1/books
+    AUTH-TOKEN: eyJzdG9yZV9pZCI6InN0b3JlLTEi...
+    AUTH-TOKEN-ID: a1b2c3d4e5f67890abcdef123456...
+    ```
+  - **JSON Response** (POST `/api/v1/auth/authorize`, `/api/v1/auth/login`):
+    ```json
+    {
+      "access_token": "eyJzdG9yZV9pZCI6InN0b3JlLTEi...",
+      "access_token_id": "a1b2c3d4e5f67890abcdef123456...",
+      "user_id": 123,
+      "token_type": "bearer"
+    }
+    ```
+
+#### Documentation
+- **✅ Updated** (`docs/endpoints.md`):
+  - Added AUTH-TOKEN-ID explanation with use cases:
+    - Tracking: Log token usage without exposing actual token
+    - Analytics: Track token lifecycle (generation, usage, expiration)
+    - Debugging: Correlate requests using the same token
+    - Security: Detect token reuse or replay attacks
+  - Updated all curl examples to show AUTH-TOKEN-ID header
+  - Added complete manual token generation section
+
+- **✅ Updated** (`services/auth-service/README.md`):
+  - Updated API Response example to include `access_token_id`
+  - Added comment explaining it's for tracking/logging
+
+#### Benefits
+- ✅ **Privacy**: Track tokens without exposing sensitive data in logs
+- ✅ **Analytics**: Enable token lifecycle analysis
+- ✅ **Debugging**: Correlate requests across services using token ID
+- ✅ **Security**: Detect token reuse, replay attacks, or anomalies
+- ✅ **Developer Experience**: Manual token generation for testing
+
+#### Technical Details
+- **Hash Algorithm**: SHA256 (256-bit hash, 64 hex characters)
+- **Input**: Base64-encoded AUTH-TOKEN string
+- **Output**: Lowercase hexadecimal string
+- **Computation**: `hashlib.sha256(auth_token.encode('utf-8')).hexdigest()`
+
 ### 2025-12-27 - AUTH-TOKEN Signature Validation & Complete Documentation
 
 #### Added
