@@ -1,0 +1,14 @@
+**/.git
+**/.gitignore
+**/.vscode
+**/.idea
+**/bin
+**/obj
+**/Logs
+**/logs
+**/.DS_Store
+**/node_modules
+**/.env
+**/README.md
+**/*.md
+!**/CHANGELOG.md
