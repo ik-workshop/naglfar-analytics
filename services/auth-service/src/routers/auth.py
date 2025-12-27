@@ -29,6 +29,7 @@ async def authorize(user_data: UserRegister):
     user = db.create_user(user_data.email, user_data.password)
 
     # Create token (auto-login after registration)
+    # TODO: read signature from env variable SIGNATURE_KEY
     token = # TODO: create for now uuid4, add a TODO to create a JSON with multiple fields and signature
     # TODO: the route should set this token SHA 256 hash as AUTH_TOKEN_ID
 

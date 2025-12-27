@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 namespace NaglfartAnalytics;
 
 /// <summary>
-/// Middleware that checks for authentication cookie and creates E-TOKEN if not present
+/// Middleware that checks for AUTH-TOKEN header and creates E-TOKEN header if not present
 /// </summary>
 public class AuthenticationMiddleware
 {
@@ -32,35 +32,26 @@ public class AuthenticationMiddleware
             return;
         }
 
-        // Check for auth cookie
-        var authCookieName = _configuration["Authentication:CookieName"] ?? "auth-token";
-        var hasAuthCookie = context.Request.Cookies.ContainsKey(authCookieName);
+        // Check for AUTH-TOKEN header
+        var authHeaderName = _configuration["Authentication:HeaderName"] ?? "AUTH-TOKEN";
+        var hasAuthToken = context.Request.Headers.ContainsKey(authHeaderName);
 
-        if (!hasAuthCookie)
+        if (!hasAuthToken)
         {
-            // Generate E-TOKEN (ephemeral token)
-            var eTokenCookieName = _configuration["Authentication:ETokenCookieName"] ?? "e-token";
-            var eToken = context.Request.Cookies[eTokenCookieName];
+            // Always generate new E-TOKEN (ephemeral token) - ignore any existing E-TOKEN
+            var eTokenHeaderName = _configuration["Authentication:ETokenHeaderName"] ?? "E-TOKEN";
 
-            if (string.IsNullOrEmpty(eToken))
-            {
-                // TODO: Make E-TOKEN generation more robust
-                // - Add timestamp/expiration
-                // - Add signature/validation
-                // - Store in Redis/distributed cache for validation
-                // - Add rotation policy
-                eToken = Guid.NewGuid().ToString();
+            // TODO: Make E-TOKEN generation more robust
+            // - Add timestamp/expiration
+            // - Add signature/validation
+            // - Store in Redis/distributed cache for validation
+            // - Add rotation policy
+            var eToken = Guid.NewGuid().ToString();
 
-                context.Response.Cookies.Append(eTokenCookieName, eToken, new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.Lax,
-                    MaxAge = TimeSpan.FromMinutes(15) // E-TOKEN expires in 15 minutes
-                });
+            // Set E-TOKEN as response header
+            context.Response.Headers.Append(eTokenHeaderName, eToken);
 
-                _logger.LogInformation("Created E-TOKEN {EToken} for request {Path}", eToken, path);
-            }
+            _logger.LogInformation("Created E-TOKEN {EToken} for request {Path}", eToken, path);
 
             // Redirect to auth-service
             var authServiceUrl = _configuration["Authentication:AuthServiceUrl"] ?? "http://localhost:8090/auth";
@@ -79,7 +70,7 @@ public class AuthenticationMiddleware
             return;
         }
 
-        // Auth cookie present, continue with request
+        // AUTH-TOKEN header present, continue with request
         await _next(context);
     }
 

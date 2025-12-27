@@ -1,0 +1,15 @@
+flowchart TD
+    A[Incoming Request] --> B{Infrastructure<br/>Endpoint?}
+    B -->|Yes /healthz,<br/>/readyz, etc.| C[Process Request<br/>Locally]
+    B -->|No| D{Has<br/>AUTH-TOKEN<br/>Header?}
+    D -->|Yes| E[Proxy to<br/>Backend Service]
+    D -->|No| H[Always Generate New<br/>E-TOKEN UUID<br/>Ignore existing E-TOKEN]
+    H --> I[Set E-TOKEN<br/>Header]
+    I --> J[Redirect to<br/>Auth Service<br/>with e-token]
+    J --> K[Auth Service]
+    K --> L[User Authenticates]
+    L --> M[Set AUTH-TOKEN<br/>Header]
+    M --> N[Redirect to<br/>Original URL]
+    N --> E
+    E --> O[Response]
+    C --> O

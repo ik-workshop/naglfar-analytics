@@ -1,0 +1,14 @@
+flowchart LR
+    A[Client] -->|Host: api.local| B[Traefik<br/>Port 80]
+    B --> C[Naglfar Validation<br/>Port 8000]
+    C --> D{Request Path?}
+    D -->|/healthz<br/>/readyz<br/>/metrics<br/>/api/v1/info| E[Local Handler]
+    D -->|All Other Paths| F{Authenticated?}
+    F -->|No| G[Redirect to<br/>Auth Service]
+    F -->|Yes| H[YARP Proxy]
+    H --> I[Book Store Service<br/>protected-service-eu:8000]
+    I --> H
+    H --> C
+    C --> B
+    B --> A
+    E --> C

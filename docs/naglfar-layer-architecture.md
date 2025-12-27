@@ -149,7 +149,7 @@ Shows the complete Naglfar protection system with all components: API Gateway (T
 
 **Responsibilities:**
 - Act as reverse proxy to Book Store backend
-- Manage authentication flow (e-token generation, auth-token validation)
+- Manage authentication flow (E-TOKEN header generation, AUTH-TOKEN header validation)
 - Check Redis for blocked IPs/tokens
 - Capture request metadata
 - Publish events to Kafka
@@ -187,12 +187,14 @@ backend:
 
 **Key Operations:**
 
-1. **E-token Generation:**
-   - Generate cryptographically secure random token
-   - Store e-token in Redis with short TTL (e.g., 2 minutes)
-   - Return 302 redirect to Auth Service with e-token
+1. **E-TOKEN Generation:**
+   - Generate cryptographically secure random token (UUID)
+   - **ALWAYS create new** - ignore any existing E-TOKEN (prevents session fixation)
+   - Set E-TOKEN as response header
+   - Return 302 redirect to Auth Service with e_token query parameter
 
-2. **Auth-token Validation:**
+2. **AUTH-TOKEN Validation:**
+   - Check for AUTH-TOKEN in request header (not cookie)
    - Verify HMAC signature using shared secret
    - Check expiration timestamp
    - Validate claims
@@ -542,7 +544,7 @@ STRING bloom_filter_tokens
 ┌──────┐
 │Client│
 └───┬──┘
-    │ 1. GET /api/v1/books (no auth-token)
+    │ 1. GET /api/v1/books (no AUTH-TOKEN header)
     ▼
 ┌─────────────────────┐
 │   API Gateway       │
@@ -551,12 +553,13 @@ STRING bloom_filter_tokens
           ▼
 ┌─────────────────────────────────┐
 │ Naglfar Validation Service      │
-│  • Check auth-token → NOT FOUND │
-│  • Generate e-token              │
-│  • Store in Redis (TTL: 2min)   │
+│  • Check AUTH-TOKEN header → NOT FOUND │
+│  • Generate NEW E-TOKEN (always)        │
+│  • Set E-TOKEN as response header       │
 └─────────┬───────────────────────┘
           │ 3. 302 Redirect
           │    Location: http://auth-service/validate?e_token=xxx&callback=...
+          │    E-TOKEN: <uuid>
           ▼
 ┌──────┐
 │Client│ 4. Follow redirect
@@ -571,17 +574,18 @@ STRING bloom_filter_tokens
 └─────────┬───────────┘
           │ 5. 302 Redirect back
           │    Location: callback?auth_token=jwt
+          │    AUTH-TOKEN: <jwt>  (as header)
           ▼
 ┌──────┐
-│Client│ 6. Follow redirect with auth-token
+│Client│ 6. Follow redirect with AUTH-TOKEN
 └───┬──┘
     │ 7. GET /api/v1/books
-    │    Authorization: Bearer <jwt>
+    │    AUTH-TOKEN: <jwt>  (header, not cookie)
     ▼
 ┌─────────────────────┐
 │   API Gateway       │
 └─────────┬───────────┘
-          │ 8. Forward with auth-token
+          │ 8. Forward with AUTH-TOKEN header
           ▼
 ┌─────────────────────────────────┐
 │ Naglfar Validation Service      │

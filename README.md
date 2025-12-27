@@ -266,6 +266,7 @@ These endpoints are commonly used by:
 - [Traefik Routes](https://doc.traefik.io/traefik/reference/routing-configuration/http/routing/rules-and-priority/#rule)
 - [Mermaid diagrams cli](https://github.com/mermaid-js/mermaid-cli)
 - [Diagrams as code](https://diagrams.mingrammer.com/docs/nodes/custom)
+- [Dapr](https://dapr.io/)
 
 ## License
 

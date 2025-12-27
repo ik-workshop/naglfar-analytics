@@ -70,54 +70,7 @@ For complete endpoint documentation, see [../../docs/endpoints.md](../../docs/en
 
 The Naglfar Validation Service acts as an **intelligent gateway** that routes requests based on their type and authentication status. Understanding this flow is critical to understanding how the service provides both security and operational visibility.
 
-```mermaid
-flowchart TD
-    Start([Incoming HTTP Request]) --> Metrics[Prometheus HTTP Metrics Middleware]
-    Metrics --> AuthMW[Authentication Middleware]
-
-    AuthMW --> InfraCheck{Is Infrastructure<br/>Endpoint?}
-
-    InfraCheck -->|"/healthz"| HealthzHandler[Local Handler:<br/>Health Check]
-    InfraCheck -->|"/readyz"| ReadyzHandler[Local Handler:<br/>Readiness Check]
-    InfraCheck -->|"/metrics"| MetricsHandler[Local Handler:<br/>Prometheus Metrics]
-    InfraCheck -->|"/api/v1/info"| InfoHandler[Local Handler:<br/>Service Info]
-    InfraCheck -->|"/swagger/*"| SwaggerHandler[Local Handler:<br/>API Documentation]
-
-    InfraCheck -->|No - Other Path| AuthCheck{Has<br/>auth-token<br/>Cookie?}
-
-    AuthCheck -->|Yes| YARPProxy[YARP Reverse Proxy]
-    YARPProxy --> Backend[Backend Service<br/>protected-service-eu:8000]
-    Backend --> Response1[HTTP Response]
-
-    AuthCheck -->|No| ETokenCheck{Has<br/>e-token<br/>Cookie?}
-
-    ETokenCheck -->|Yes| ReuseEToken[Reuse Existing<br/>E-TOKEN]
-    ETokenCheck -->|No| GenerateEToken[Generate New<br/>E-TOKEN UUID]
-
-    GenerateEToken --> SetCookie[Set e-token Cookie<br/>HttpOnly, Secure, SameSite=Lax<br/>Max-Age=900 sec]
-    SetCookie --> Redirect[302 Redirect to Auth Service]
-    ReuseEToken --> Redirect
-
-    Redirect --> RedirectURL[Location: auth-service?<br/>return_url=original_path<br/>&e_token=uuid]
-    RedirectURL --> AuthService[Auth Service<br/>localhost:8090/auth]
-
-    AuthService --> UserAuth[User Authenticates]
-    UserAuth --> SetAuthCookie[Auth Service Sets<br/>auth-token Cookie]
-    SetAuthCookie --> RedirectBack[Redirect Back to<br/>Original return_url]
-    RedirectBack --> Start
-
-    HealthzHandler --> Response2[HTTP Response]
-    ReadyzHandler --> Response2
-    MetricsHandler --> Response2
-    InfoHandler --> Response2
-    SwaggerHandler --> Response2
-
-    style InfraCheck fill:#e1f5ff
-    style AuthCheck fill:#fff4e1
-    style YARPProxy fill:#e8f5e9
-    style Redirect fill:#ffebee
-    style AuthMW fill:#f3e5f5
-```
+![Request Processing Flow](../../docs/assets/diagrams/naglfar-validation/request-processing-flow.svg)
 
 ### Why Not All Requests Are Proxied
 
@@ -149,8 +102,8 @@ The service handles specific infrastructure and observability endpoints locally 
 
 Any request that doesn't match infrastructure endpoints follows this path:
 
-1. **Authentication Check**: AuthenticationMiddleware verifies `auth-token` cookie
-2. **E-TOKEN Generation**: If unauthenticated, generate E-TOKEN and redirect to auth service
+1. **Authentication Check**: AuthenticationMiddleware verifies `AUTH-TOKEN` header
+2. **E-TOKEN Generation**: If unauthenticated, always generate new E-TOKEN and redirect to auth service
 3. **YARP Proxy**: If authenticated, proxy the request to the configured backend using the catch-all route `{**catch-all}`
 
 This pattern is implemented in `AuthenticationMiddleware.cs`:
@@ -246,26 +199,7 @@ The Naglfar Validation Service implements an authentication gateway that enforce
 
 ### Authentication Flow
 
-```mermaid
-flowchart TD
-    A[Incoming Request] --> B{Infrastructure<br/>Endpoint?}
-    B -->|Yes /healthz,<br/>/readyz, etc.| C[Process Request<br/>Locally]
-    B -->|No| D{Has<br/>auth-token<br/>cookie?}
-    D -->|Yes| E[Proxy to<br/>Backend Service]
-    D -->|No| F{Has<br/>e-token<br/>cookie?}
-    F -->|Yes| G[Redirect to<br/>Auth Service<br/>with existing e-token]
-    F -->|No| H[Generate New<br/>E-TOKEN UUID]
-    H --> I[Set e-token<br/>Cookie<br/>15 min expiry]
-    I --> J[Redirect to<br/>Auth Service<br/>with e-token]
-    G --> K[Auth Service]
-    J --> K
-    K --> L[User Authenticates]
-    L --> M[Set auth-token<br/>Cookie]
-    M --> N[Redirect to<br/>Original URL]
-    N --> E
-    E --> O[Response]
-    C --> O
-```
+![Authentication Flow](../../docs/assets/diagrams/naglfar-validation/authentication-flow.svg)
 
 ### E-TOKEN (Ephemeral Token)
 
@@ -273,27 +207,23 @@ The **E-TOKEN** is a temporary tracking token generated for unauthenticated user
 
 **Properties:**
 - **Format**: UUID (e.g., `a1b2c3d4-e5f6-7890-abcd-ef1234567890`)
-- **Storage**: HTTP-only cookie
-- **Lifetime**: 15 minutes
-- **Security**:
-  - `HttpOnly`: Prevents JavaScript access
-  - `Secure`: HTTPS only
-  - `SameSite=Lax`: CSRF protection
+- **Storage**: Response header
+- **Generation**: Always created new for each unauthenticated request (existing E-TOKENs are ignored)
 
 **Purpose:**
 - Track user session before authentication
 - Correlate pre-auth and post-auth requests
-- Prevent session fixation attacks
+- Prevent session fixation attacks by always generating new tokens
 
-**Cookie Name**: `e-token` (configurable in `appsettings.json`)
+**Header Name**: `E-TOKEN` (configurable in `appsettings.json`)
 
-### Authentication Cookie
+### Authentication Header
 
-After successful authentication, the auth service sets an `auth-token` cookie:
+After successful authentication, the auth service sets an `AUTH-TOKEN` header:
 
 **Properties:**
 - **Format**: Implementation-dependent (JWT, signed token, etc.)
-- **Cookie Name**: `auth-token` (configurable in `appsettings.json`)
+- **Header Name**: `AUTH-TOKEN` (configurable in `appsettings.json`)
 - **Validation**: Checked on every request by AuthenticationMiddleware
 
 ### Redirect Flow
@@ -307,10 +237,10 @@ Original Request:
 Redirect Response:
   302 Found
   Location: http://localhost:8090/auth?return_url=http://api.local/api/v1/books&e_token=<uuid>
-  Set-Cookie: e-token=<uuid>; HttpOnly; Secure; SameSite=Lax; Max-Age=900
+  E-TOKEN: <uuid>
 ```
 
-After authentication at the auth service, the user is redirected back to `return_url` with a valid `auth-token` cookie.
+After authentication at the auth service, the user is redirected back to `return_url` with a valid `AUTH-TOKEN` header.
 
 ### Exempt Endpoints
 
@@ -354,22 +284,7 @@ The service uses **YARP (Yet Another Reverse Proxy)** to proxy requests to backe
 
 ### Request Routing
 
-```mermaid
-flowchart LR
-    A[Client] -->|Host: api.local| B[Traefik<br/>Port 80]
-    B --> C[Naglfar Validation<br/>Port 8000]
-    C --> D{Request Path?}
-    D -->|/healthz<br/>/readyz<br/>/metrics<br/>/api/v1/info| E[Local Handler]
-    D -->|All Other Paths| F{Authenticated?}
-    F -->|No| G[Redirect to<br/>Auth Service]
-    F -->|Yes| H[YARP Proxy]
-    H --> I[Book Store Service<br/>protected-service-eu:8000]
-    I --> H
-    H --> C
-    C --> B
-    B --> A
-    E --> C
-```
+![Request Routing](../../docs/assets/diagrams/naglfar-validation/request-routing.svg)
 
 ### Benefits of Catch-All Approach
 
@@ -387,7 +302,7 @@ The complete request processing order in Program.cs:
 
 ```csharp
 1. HTTP Metrics Middleware (Prometheus)
-2. Authentication Middleware (checks cookies, generates E-TOKEN)
+2. Authentication Middleware (checks AUTH-TOKEN header, generates E-TOKEN)
 3. Infrastructure Endpoints (/healthz, /readyz, /metrics, /info)
 4. YARP Reverse Proxy (catch-all to backend services)
 ```
@@ -508,8 +423,8 @@ Configuration files are located in `src/NaglfartAnalytics/`:
 ```json
 {
   "Authentication": {
-    "CookieName": "auth-token",
-    "ETokenCookieName": "e-token",
+    "HeaderName": "AUTH-TOKEN",
+    "ETokenHeaderName": "E-TOKEN",
     "AuthServiceUrl": "http://localhost:8090/auth"
   }
 }

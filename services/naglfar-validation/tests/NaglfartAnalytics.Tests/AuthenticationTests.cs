@@ -79,7 +79,7 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task ProtectedEndpoint_WithoutAuthCookie_RedirectsToAuthService()
+    public async Task ProtectedEndpoint_WithoutAuthTokenHeader_RedirectsToAuthService()
     {
         // Arrange
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -102,7 +102,7 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task ProtectedEndpoint_WithoutAuthCookie_SetsETokenCookie()
+    public async Task ProtectedEndpoint_WithoutAuthTokenHeader_SetsETokenHeader()
     {
         // Arrange
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -114,20 +114,14 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
         var response = await client.GetAsync("/api/v1/books");
 
         // Assert
-        Assert.True(response.Headers.TryGetValues("Set-Cookie", out var cookies));
-        var cookiesList = cookies.ToList();
-
-        // Should have e-token cookie
-        var eTokenCookie = cookiesList.FirstOrDefault(c => c.Contains("e-token"));
-        Assert.NotNull(eTokenCookie);
-
-        // Verify cookie security attributes (case-insensitive as format may vary)
-        Assert.Contains("httponly", eTokenCookie.ToLower());
-        Assert.Contains("samesite=lax", eTokenCookie.ToLower());
+        Assert.True(response.Headers.TryGetValues("E-TOKEN", out var headerValues));
+        var eToken = headerValues.FirstOrDefault();
+        Assert.NotNull(eToken);
+        Assert.NotEmpty(eToken);
     }
 
     [Fact]
-    public async Task ProtectedEndpoint_WithAuthCookie_AllowsRequest()
+    public async Task ProtectedEndpoint_WithAuthTokenHeader_AllowsRequest()
     {
         // Arrange
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -135,8 +129,8 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
             AllowAutoRedirect = false
         });
 
-        // Add auth-token cookie
-        client.DefaultRequestHeaders.Add("Cookie", "auth-token=valid-token-123");
+        // Add AUTH-TOKEN header
+        client.DefaultRequestHeaders.Add("AUTH-TOKEN", "valid-token-123");
 
         // Act
         var response = await client.GetAsync("/api/v1/books");
@@ -145,30 +139,6 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
         // Should either return OK (200) or NotFound (404) from backend, NOT redirect (302)
         Assert.NotEqual(HttpStatusCode.Redirect, response.StatusCode);
         Assert.NotEqual(HttpStatusCode.Found, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task ETokenCookie_HasCorrectMaxAge()
-    {
-        // Arrange
-        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = false
-        });
-
-        // Act
-        var response = await client.GetAsync("/api/v1/protected");
-
-        // Assert
-        if (response.Headers.TryGetValues("Set-Cookie", out var cookies))
-        {
-            var eTokenCookie = cookies.FirstOrDefault(c => c.Contains("e-token"));
-            if (eTokenCookie != null)
-            {
-                // Verify Max-Age is set (15 minutes = 900 seconds)
-                Assert.Contains("Max-Age=900", eTokenCookie, StringComparison.OrdinalIgnoreCase);
-            }
-        }
     }
 
     [Fact]
@@ -196,7 +166,7 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task ExistingEToken_IsReusedInRedirect()
+    public async Task ExistingEToken_IsIgnored_NewTokenAlwaysCreated()
     {
         // Arrange
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
@@ -205,7 +175,7 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
         });
 
         var existingEToken = "existing-e-token-12345";
-        client.DefaultRequestHeaders.Add("Cookie", $"e-token={existingEToken}");
+        client.DefaultRequestHeaders.Add("E-TOKEN", existingEToken);
 
         // Act
         var response = await client.GetAsync("/api/v1/books");
@@ -216,7 +186,14 @@ public class AuthenticationTests : IClassFixture<WebApplicationFactory<Program>>
         var location = response.Headers.Location?.ToString();
         Assert.NotNull(location);
 
-        // The redirect should include the existing e-token
-        Assert.Contains($"e_token={existingEToken}", location);
+        // A new E-TOKEN should be created (not the existing one)
+        Assert.DoesNotContain($"e_token={existingEToken}", location);
+        Assert.Contains("e_token=", location);
+
+        // Verify new E-TOKEN was set in response header
+        Assert.True(response.Headers.TryGetValues("E-TOKEN", out var headerValues));
+        var newEToken = headerValues.FirstOrDefault();
+        Assert.NotNull(newEToken);
+        Assert.NotEqual(existingEToken, newEToken);
     }
 }

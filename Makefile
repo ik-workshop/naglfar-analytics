@@ -3,7 +3,7 @@ MAKEFLAGS += --warn-undefined-variables
 MAKEFLAGS += --no-builtin-rules
 
 DIAGRAMS_DIR := docs/assets/diagrams
-DIAGRAMS_SRC := $(wildcard $(DIAGRAMS_DIR)/*.mmd)
+DIAGRAMS_SRC := $(shell find $(DIAGRAMS_DIR) -name '*.mmd' 2>/dev/null)
 DIAGRAMS_SVG := $(DIAGRAMS_SRC:.mmd=.svg)
 MERMAID_CLI_VERSION := 11.12.0
 MERMAID_CLI_IMAGE := minlag/mermaid-cli:$(MERMAID_CLI_VERSION)
@@ -101,5 +101,5 @@ diagrams-validate: ## Validate Mermaid diagrams by checking for syntax errors
 
 diagrams-clean: ## Remove generated SVG files
 	@echo "Cleaning generated SVG files..."
-	@rm -f $(DIAGRAMS_DIR)/*.svg
-	@echo "✓ Cleaned $(DIAGRAMS_DIR)/"
+	@find $(DIAGRAMS_DIR) -name '*.svg' -type f -delete 2>/dev/null || true
+	@echo "✓ Cleaned $(DIAGRAMS_DIR)/ and subdirectories"

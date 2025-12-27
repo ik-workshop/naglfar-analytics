@@ -91,6 +91,97 @@ A lightweight .NET web application providing **health monitoring and analytics c
 
 ## Changelog
 
+### 2025-12-27 - Header-Based Authentication & Diagram Management
+
+#### Changed
+- **✅ Authentication Method** (`services/naglfar-validation/`):
+  - **Before**: Cookie-based authentication (auth-token cookie, e-token cookie)
+  - **After**: Header-based authentication (AUTH-TOKEN header, E-TOKEN header)
+
+  **AuthenticationMiddleware Changes** (`AuthenticationMiddleware.cs`):
+  - Line 36: Check for `AUTH-TOKEN` header instead of `auth-token` cookie
+  - Line 42: Always generate new `E-TOKEN` (ignore any existing E-TOKEN)
+  - Line 55: Set `E-TOKEN` as response header instead of cookie
+  - Removed cookie security options (HttpOnly, Secure, SameSite, MaxAge)
+
+  **Configuration Updates** (`appsettings.json:9-13`):
+  ```json
+  {
+    "Authentication": {
+      "HeaderName": "AUTH-TOKEN",         // was: "CookieName": "auth-token"
+      "ETokenHeaderName": "E-TOKEN",
+      "AuthServiceUrl": "http://localhost:8090/auth"
+    }
+  }
+  ```
+
+- **✅ E-TOKEN Security Model**:
+  - **Before**: Reused existing E-TOKEN if present in cookie
+  - **After**: Always generates new E-TOKEN on each unauthenticated request
+  - **Benefit**: Prevents session fixation attacks by never reusing tokens
+
+- **✅ Test Suite Updates** (`tests/AuthenticationTests.cs`):
+  - Renamed tests to reflect header-based authentication
+  - Updated `ProtectedEndpoint_WithAuthTokenHeader_AllowsRequest` (line 124)
+  - Updated `ExistingEToken_IsIgnored_NewTokenAlwaysCreated` (line 169)
+  - Removed `ETokenCookie_HasCorrectMaxAge` test (no longer relevant for headers)
+  - **Test Results**: 19/19 passing
+
+- **✅ Documentation Updates** (`services/naglfar-validation/README.md`):
+  - Updated "Complete Request Processing Flow" diagram
+  - Updated "Authentication Flow" diagram
+  - Updated E-TOKEN section: header-based storage instead of cookies
+  - Updated "Authentication Header" section (was: "Authentication Cookie")
+  - Updated redirect flow examples
+  - Updated code comments and pipeline descriptions
+
+#### Added
+- **✅ Diagram Management System** (`docs/assets/diagrams/`):
+  - **Diagram Organization**:
+    - Created `docs/assets/diagrams/naglfar-validation/` subdirectory
+    - Extracted 3 mermaid diagrams from README to `.mmd` files
+    - Replaced inline mermaid code blocks with SVG image references
+
+  **Extracted Diagrams**:
+  1. `request-processing-flow.mmd` (1.8KB) - Complete request flow with headers
+  2. `authentication-flow.mmd` (604B) - Simplified auth flow with headers
+  3. `request-routing.mmd` (465B) - Traefik routing diagram
+
+  **Makefile Updates** (`Makefile:5-7, 102-105`):
+  - Line 6: Changed to `find` command for recursive subdirectory search
+  - Supports `.mmd` files in any subdirectory under `docs/assets/diagrams/`
+  - Updated `diagrams-clean` to recursively delete SVG files
+  - **Usage**: `make diagrams` now generates SVGs from all subdirectories
+
+#### Benefits
+- ✅ **Security**: Header-based auth is more RESTful and easier to work with in APIs
+- ✅ **Session Security**: Always generating new E-TOKEN prevents session fixation
+- ✅ **Diagram Maintainability**: Single source of truth for diagrams (.mmd files)
+- ✅ **Scalability**: Easy to add diagrams for other services in subdirectories
+- ✅ **Automated Workflow**: `make diagrams` handles all diagram generation
+
+#### Technical Details
+- **Authentication Flow**:
+  ```
+  1. Request without AUTH-TOKEN header → generate new E-TOKEN
+  2. Set E-TOKEN as response header
+  3. Redirect to auth service with e_token query parameter
+  4. Auth service validates → returns AUTH-TOKEN header
+  5. Subsequent requests include AUTH-TOKEN header
+  ```
+
+- **Diagram Generation**:
+  ```bash
+  # Find all .mmd files recursively
+  find docs/assets/diagrams -name '*.mmd'
+
+  # Generate SVGs for all found files
+  make diagrams
+
+  # Clean all generated SVGs
+  make diagrams-clean
+  ```
+
 ### 2025-12-27 - Naglfar Validation: YARP Proxy & Authentication Gateway
 
 #### Added
@@ -106,16 +197,16 @@ A lightweight .NET web application providing **health monitoring and analytics c
 
 - **✅ Authentication Middleware** (`AuthenticationMiddleware.cs`):
   - **E-TOKEN Generation**: Creates ephemeral UUID tokens for unauthenticated users
-  - **Cookie-Based Auth**: Checks for `auth-token` cookie on all requests
+  - **Header-Based Auth**: Checks for `AUTH-TOKEN` header on all requests *(updated: was cookies, changed to headers later same day)*
   - **Redirect Flow**: Redirects unauthenticated users to auth-service
   - **Infrastructure Bypass**: Exempts `/healthz`, `/readyz`, `/metrics`, `/api/v1/info`, `/swagger`
 
-  **E-TOKEN Properties**:
+  **E-TOKEN Properties** *(updated later same day to use headers)*:
   ```csharp
   - Format: UUID (e.g., "a1b2c3d4-...")
-  - Cookie Name: "e-token" (configurable)
-  - Lifetime: 15 minutes
-  - Security: HttpOnly, Secure, SameSite=Lax
+  - Header Name: "E-TOKEN" (configurable)
+  - Always generated new (existing tokens ignored)
+  - Storage: Response header (was: HttpOnly cookie)
   ```
 
   **Redirect URL Format**:
@@ -123,12 +214,12 @@ A lightweight .NET web application providing **health monitoring and analytics c
   http://localhost:8090/auth?return_url=<encoded-url>&e_token=<uuid>
   ```
 
-- **✅ Authentication Configuration** (`appsettings.json:9-13`):
+- **✅ Authentication Configuration** (`appsettings.json:9-13`) *(updated later same day)*:
   ```json
   {
     "Authentication": {
-      "CookieName": "auth-token",
-      "ETokenCookieName": "e-token",
+      "HeaderName": "AUTH-TOKEN",         // was: "CookieName"
+      "ETokenHeaderName": "E-TOKEN",      // was: "ETokenCookieName"
       "AuthServiceUrl": "http://localhost:8090/auth"
     }
   }
