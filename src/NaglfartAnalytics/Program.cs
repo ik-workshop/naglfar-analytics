@@ -10,6 +10,7 @@ builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -28,7 +29,7 @@ app.MapGet("/readyz", () => Results.Ok(new { status = "Ready" }))
     .WithOpenApi();
 
 // Root endpoint
-app.MapGet("/", () => Results.Ok(new { 
+app.MapGet("/", () => Results.Ok(new {
     application = "Naglfar Analytics",
     description = "The ship made of dead men's nails. A bit darker, but represents collection and analysis of threat data.",
     version = "1.0.0"

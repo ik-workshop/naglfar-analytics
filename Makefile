@@ -1,23 +1,26 @@
-.PHONY: help build run test clean docker-build docker-run docker-stop docker-clean restore
-
 # Default target
-help:
-	@echo "Naglfar Analytics - Makefile Commands"
-	@echo "======================================"
-	@echo "Local Development (without Docker):"
-	@echo "  make restore       - Restore .NET dependencies"
-	@echo "  make build         - Build the application"
-	@echo "  make run           - Run the application locally"
-	@echo "  make test          - Run tests"
-	@echo "  make clean         - Clean build artifacts"
-	@echo ""
-	@echo "Docker Commands:"
-	@echo "  make docker-build  - Build Docker image"
-	@echo "  make docker-run    - Run application in Docker"
-	@echo "  make docker-stop   - Stop Docker containers"
-	@echo "  make docker-clean  - Remove Docker images and containers"
-	@echo "  make docker-up     - Build and run with docker-compose"
-	@echo "  make docker-down   - Stop and remove docker-compose containers"
+# help:
+# 	@echo "Naglfar Analytics - Makefile Commands"
+# 	@echo "======================================"
+# 	@echo "Local Development (without Docker):"
+# 	@echo "  make restore       - Restore .NET dependencies"
+# 	@echo "  make build         - Build the application"
+# 	@echo "  make run           - Run the application locally"
+# 	@echo "  make test          - Run tests"
+# 	@echo "  make clean         - Clean build artifacts"
+# 	@echo ""
+# 	@echo "Docker Commands:"
+# 	@echo "  make docker-build  - Build Docker image"
+# 	@echo "  make docker-run    - Run application in Docker"
+# 	@echo "  make docker-stop   - Stop Docker containers"
+# 	@echo "  make docker-clean  - Remove Docker images and containers"
+# 	@echo "  make docker-up     - Build and run with docker-compose"
+# 	@echo "  make docker-down   - Stop and remove docker-compose containers"
+
+.PHONY: help
+#? help: Get more info on available commands
+help: Makefile
+	@sed -n 's/^#?//p' $< | column -t -s ':' |  sort | sed -e 's/^/ /'
 
 # Local build without Docker
 restore:
@@ -68,18 +71,24 @@ docker-clean: docker-stop
 	@echo "Removing Docker image..."
 	docker rmi naglfar-analytics:latest || true
 
-# Docker Compose commands
-docker-up:
+#? compose-up: Build and run with docker-compose
+compose-up:
 	@echo "Starting application with docker-compose..."
 	@echo "Application will be available at: http://localhost:8080"
 	@echo "Health check: http://localhost:8080/healthz"
 	@echo "Readiness check: http://localhost:8080/readyz"
-	docker-compose up -d --build
+	docker-compose up --build
 
-docker-down:
+#? compose-down: Stop and remove docker-compose containers
+compose-down:
 	@echo "Stopping docker-compose services..."
 	docker-compose down
 
-docker-logs:
+#? compose-logs: show logs for docker-compose containers
+compose-logs:
 	@echo "Showing docker-compose logs..."
 	docker-compose logs -f
+
+#? api-rebuild: rebuild api
+api-rebuild:
+	@docker compose -f docker-compose.yml up -d --build api
