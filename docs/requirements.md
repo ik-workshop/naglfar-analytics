@@ -115,7 +115,11 @@
   - [ ] Time-series database (InfluxDB, TimescaleDB)
   - [ ] Document store (MongoDB, Elasticsearch)
   - [ ] Object storage (S3, Minio)
-  - [x] In-memory cache (Redis) - **Active: pub/sub for E-TOKEN events**
+  - [x] In-memory cache (Redis) - **✅ IMPLEMENTED**
+    - ✅ Pub/sub for E-TOKEN generation events (channel: naglfar-events)
+    - ✅ Event format: `{client_ip, store_id, action, timestamp}`
+    - 📋 Future: Cache for block lists (blocked IPs, blocked tokens)
+    - 📋 Future: Bloom filters for memory-efficient blocking
 
 ### Outputs & Reports
 **Questions to answer:**
@@ -240,7 +244,7 @@
 **Questions to answer:**
 - What external services are required?
   - [x] Message queue (RabbitMQ, Kafka)
-  - [x] Cache (Redis, Memcached) - **Redis for pub/sub and caching**
+  - [x] Cache (Redis, Memcached) - **✅ Redis 8.x implemented for pub/sub (naglfar-events channel)**
   - [ ] Search engine (Elasticsearch)
   - [x] Monitoring (Prometheus, Grafana)
   - [ ] Logging (ELK stack, Loki)
@@ -324,8 +328,14 @@
 - **API Gateway**: Traefik v3.6
 - **Metrics**: Prometheus (prometheus-net.AspNetCore)
 - **Testing**: xUnit, WebApplicationFactory
-- **Cache/Pub-Sub**: Redis 8.x
-- **Message Broker**: Redis pub/sub (naglfar-events channel)
+- **Cache/Pub-Sub**: Redis 8.x (StackExchange.Redis 2.10.1)
+  - ✅ Pub/sub for E-TOKEN generation events (naglfar-events channel)
+  - 📋 Future: Block lists (blocked IPs, blocked tokens)
+  - 📋 Future: Bloom filters for memory-efficient blocking
+- **Authentication**:
+  - ✅ E-TOKEN (Base64-encoded JSON, 15-minute expiry)
+  - ✅ AUTH-TOKEN (Base64-encoded JSON with HMAC-SHA256 signature, 5-minute expiry)
+  - ✅ SIGNATURE_KEY shared between naglfar-validation and auth-service
 - **Reverse Proxy**: YARP (Yet Another Reverse Proxy)
 
 ### Constraints & Limitations

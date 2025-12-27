@@ -51,6 +51,9 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 // Register Redis publisher service
 builder.Services.AddSingleton<IRedisPublisher, RedisPublisher>();
 
+// Register AUTH-TOKEN validator
+builder.Services.AddSingleton<AuthTokenValidator>();
+
 // Add YARP reverse proxy
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));

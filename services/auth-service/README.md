@@ -86,10 +86,11 @@ The Auth Service is a simple authentication service that validates E-TOKENs from
 
 ### Authentication Endpoints
 
-| Endpoint | Method | Purpose | Request Body | Response |
-|----------|--------|---------|--------------|----------|
-| `/api/v1/auth/authorize` | POST | Register new user | `{email, password}` | `{access_token, user_id}` |
-| `/api/v1/auth/login` | POST | Login user | `{email, password}` | `{access_token, user_id}` |
+| Endpoint | Method | Purpose | Query Params | Request Body | Response |
+|----------|--------|---------|--------------|--------------|----------|
+| `/api/v1/auth/` | GET | Authentication page<br/>(redirect from naglfar) | `e_token`, `return_url` | - | 302 Redirect with<br/>AUTH-TOKEN header |
+| `/api/v1/auth/authorize` | POST | Register new user | `store_id` | `{email, password}` | `{access_token, user_id}` |
+| `/api/v1/auth/login` | POST | Login user | `store_id` | `{email, password}` | `{access_token, user_id}` |
 
 ### Example Requests
 
@@ -155,9 +156,11 @@ Currently uses a simple in-memory database (`storage/database.py`):
 
 **Future Plans:**
 - Add PostgreSQL or Redis for persistence
-- Implement JWT with signature verification
-- Add token expiration and refresh tokens
-- Share secret key with naglfar-validation (SIGNATURE_KEY env var)
+- ~~Implement signature verification~~ ✅ Done (HMAC-SHA256)
+- ~~Add token expiration~~ ✅ Done (5 minutes)
+- ~~Share secret key with naglfar-validation~~ ✅ Done (SIGNATURE_KEY env var)
+- Add token refresh mechanism
+- Add login/register UI form
 
 ### User Model
 
@@ -172,11 +175,30 @@ Currently uses a simple in-memory database (`storage/database.py`):
 
 ### Token Model
 
+**AUTH-TOKEN Format (Base64-encoded JSON with HMAC-SHA256 signature):**
+
+```python
+# Decoded AUTH-TOKEN structure
+{
+  "store_id": "store-1",
+  "user_id": 123,
+  "expired_at": "2025-12-27T16:00:00.000Z",  # UTC, +5 minutes from generation
+  "signature": "abc123def456..."  # HMAC-SHA256 hex string
+}
+
+# Signature Generation:
+# 1. Create message from sorted token data (without signature):
+#    message = json.dumps({"expired_at": "...", "store_id": "...", "user_id": 123}, sort_keys=True)
+# 2. Compute HMAC-SHA256:
+#    signature = hmac.new(SIGNATURE_KEY.encode('utf-8'), message.encode('utf-8'), hashlib.sha256).hexdigest()
+# 3. Add signature to token data and base64 encode the complete JSON
+```
+
+**API Response:**
 ```python
 {
-  "access_token": "uuid-string",  # TODO: JWT
-  "user_id": 1,
-  "token_type": "bearer"
+  "access_token": "base64_encoded_auth_token_string",
+  "user_id": 123
 }
 ```
 
@@ -263,24 +285,31 @@ Service-specific commands are defined in `helpers.mk` and automatically availabl
 
 ### ✅ Implemented
 - FastAPI application with CORS support
+- **Authentication redirect endpoint (`/api/v1/auth/`)**
+  - E-TOKEN validation (base64 decode, parse JSON, check expiry)
+  - Auto-authentication with test@example.com (TEMPORARY)
+  - AUTH-TOKEN generation with HMAC-SHA256 signature
+  - 302 redirect back to return_url with AUTH-TOKEN header
 - User registration endpoint (`/api/v1/auth/authorize`)
 - User login endpoint (`/api/v1/auth/login`)
+- **AUTH-TOKEN generation with:**
+  - HMAC-SHA256 signature using SIGNATURE_KEY
+  - Base64-encoded JSON format
+  - 5-minute expiration
+  - store_id and user_id claims
 - In-memory user database
 - Password hashing (SHA-256)
-- Token generation (UUID)
+- Pre-created test user: `test@example.com` / `password123`
 - Health check endpoints (`/healthz`, `/readyz`)
 - Docker containerization
 - Swagger UI documentation
 
 ### 🔄 In Progress
-- JWT token implementation with SIGNATURE_KEY
-- E-TOKEN validation from naglfar-validation
-- Redirect flow back to return_url with AUTH-TOKEN header
+- Login/register form UI (currently auto-authenticates)
 
 ### 📋 Planned
 - PostgreSQL or Redis persistence
-- Token expiration and refresh tokens
-- JWT with shared secret verification
+- Token refresh mechanism
 - Rate limiting for authentication endpoints
 - Failed login attempt tracking
 - Email verification

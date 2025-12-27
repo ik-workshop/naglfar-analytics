@@ -206,25 +206,65 @@ The Naglfar Validation Service implements an authentication gateway that enforce
 The **E-TOKEN** is a temporary tracking token generated for unauthenticated users:
 
 **Properties:**
-- **Format**: UUID (e.g., `a1b2c3d4-e5f6-7890-abcd-ef1234567890`)
+- **Format**: Base64-encoded JSON
+  ```json
+  {
+    "expiry_date": "2025-12-27T15:45:00.000Z",
+    "store_id": "store-1"
+  }
+  ```
 - **Storage**: Response header
 - **Generation**: Always created new for each unauthenticated request (existing E-TOKENs are ignored)
+- **Expiration**: 15 minutes from generation
+- **Store ID**: Extracted from request path (e.g., `/api/v1/**store-1**/books`)
 
 **Purpose:**
 - Track user session before authentication
+- Identify which store the user is accessing
 - Correlate pre-auth and post-auth requests
 - Prevent session fixation attacks by always generating new tokens
 
 **Header Name**: `E-TOKEN` (configurable in `appsettings.json`)
+
+**Redis Pub/Sub Event:**
+When an E-TOKEN is generated, the service publishes an event to Redis (channel: `naglfar-events`):
+```json
+{
+  "client_ip": "203.0.113.42",
+  "store_id": "store-1",
+  "action": "e-token",
+  "timestamp": "2025-12-27T15:30:00.000Z"
+}
+```
 
 ### Authentication Header
 
 After successful authentication, the auth service sets an `AUTH-TOKEN` header:
 
 **Properties:**
-- **Format**: Implementation-dependent (JWT, signed token, etc.)
+- **Format**: Base64-encoded JSON with HMAC-SHA256 signature
+  ```json
+  {
+    "store_id": "store-1",
+    "user_id": 123,
+    "expired_at": "2025-12-27T16:00:00.000Z",
+    "signature": "hmac_sha256_hex_string"
+  }
+  ```
 - **Header Name**: `AUTH-TOKEN` (configurable in `appsettings.json`)
-- **Validation**: Checked on every request by AuthenticationMiddleware
+- **Expiration**: 5 minutes from generation
+- **Validation**: Checked on every request by AuthenticationMiddleware using `AuthTokenValidator` service
+
+**Validation Process:**
+The `AuthTokenValidator` service validates AUTH-TOKENs by:
+1. Decoding the base64-encoded JSON
+2. Verifying the HMAC-SHA256 signature using the shared `SIGNATURE_KEY`
+3. Checking the token expiration timestamp
+4. Validating the `store_id` matches the request path
+5. Adding `UserId` and `StoreId` to `HttpContext.Items` on success
+
+**On Validation Failure:**
+If the AUTH-TOKEN is invalid, expired, or has incorrect signature, the service treats the request as unauthenticated and generates a new E-TOKEN, redirecting to the auth service.
 
 ### Redirect Flow
 
@@ -232,15 +272,15 @@ When a user without authentication accesses a protected resource:
 
 ```
 Original Request:
-  GET http://api.local/api/v1/books
+  GET http://api.local/api/v1/store-1/books
 
 Redirect Response:
   302 Found
-  Location: http://localhost:8090/auth?return_url=http://api.local/api/v1/books&e_token=<uuid>
-  E-TOKEN: <uuid>
+  Location: http://localhost:8090/api/v1/auth?return_url=http://api.local/api/v1/store-1/books&e_token=eyJleHBpcnlfZGF0ZSI6Li4ufQ==
+  E-TOKEN: eyJleHBpcnlfZGF0ZSI6IjIwMjUtMTItMjdUMTU6NDU6MDAuMDAwWiIsInN0b3JlX2lkIjoic3RvcmUtMSJ9
 ```
 
-After authentication at the auth service, the user is redirected back to `return_url` with a valid `AUTH-TOKEN` header.
+After authentication at the auth service, the user is redirected back to `return_url` with a valid `AUTH-TOKEN` header containing the user_id, store_id, expiration, and HMAC-SHA256 signature.
 
 ### Exempt Endpoints
 

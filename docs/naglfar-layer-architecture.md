@@ -178,8 +178,8 @@ blocking:
 authentication:
   header_name: "AUTH-TOKEN"  # Auth token header
   e_token_header_name: "E-TOKEN"  # Ephemeral token header
-  shared_secret: "${SHARED_SECRET}"  # shared with Auth Service
-  auth_service_url: "http://auth-service/validate"
+  signature_key: "${SIGNATURE_KEY}"  # HMAC-SHA256 key shared with Auth Service
+  auth_service_url: "http://auth-service:8090/api/v1/auth"
 
 backend:
   regions:
@@ -226,11 +226,24 @@ stores:
      ```
    - Return 302 redirect to Auth Service with e_token query parameter
 
-2. **AUTH-TOKEN Validation:**
+2. **AUTH-TOKEN Validation:** (✅ IMPLEMENTED)
    - Check for AUTH-TOKEN in request header (not cookie)
-   - Verify HMAC signature using shared secret
-   - Check expiration timestamp
-   - Validate claims
+   - Decode base64-encoded JSON:
+     ```json
+     {
+       "store_id": "store-1",
+       "user_id": 123,
+       "expired_at": "2025-12-27T16:00:00.000Z",
+       "signature": "hmac_sha256_hex"
+     }
+     ```
+   - Verify HMAC-SHA256 signature using SIGNATURE_KEY
+   - Recreate message: `{"expired_at":"...","store_id":"...","user_id":123}` (snake_case, sorted)
+   - Compare computed signature with provided signature
+   - Check expiration timestamp (must be > current UTC time)
+   - Validate store_id matches path (e.g., /api/v1/**store-1**/books)
+   - On success: Add UserId and StoreId to HttpContext.Items
+   - On failure: Treat as unauthenticated, generate new E-TOKEN
 
 3. **Abuse Check (Redis lookup):**
    - Hash client IP
@@ -260,48 +273,91 @@ stores:
 
 ---
 
-### 2. Auth Service (Python + FastAPI - 3rd Party)
+### 2. Auth Service (Python + FastAPI - 3rd Party) ✅ IMPLEMENTED
 
 **Responsibilities:**
-- Validate e-tokens
-- Generate auth-tokens (JWT)
-- Share secret with Naglfar Validation Service
+- Validate E-TOKENs from naglfar-validation
+- Generate AUTH-TOKENs with HMAC-SHA256 signatures
+- User registration and login
+- Share SIGNATURE_KEY with Naglfar Validation Service
 
 **Tech Stack:**
 - Python 3.11+
 - FastAPI
-- PyJWT (for auth-token generation)
+- SQLite database (in-memory for development)
+- HMAC-SHA256 (standard library)
 
 **API Endpoints:**
 ```
-POST /auth/validate
+GET /api/v1/auth/
+  Query Params:
+    - e_token: base64-encoded JSON ephemeral token
+    - return_url: URL to redirect after authentication
+  Response:
+    - 302 Redirect to return_url with AUTH-TOKEN header
+    - Currently auto-authenticates with test@example.com
+
+POST /api/v1/auth/authorize
   Request:
     {
-      "e_token": "string"
+      "email": "user@example.com",
+      "password": "password123"
     }
+  Query Params:
+    - store_id: Store identifier
   Response:
     {
-      "auth_token": "jwt-string",
-      "expires_in": 3600
+      "access_token": "base64-encoded-auth-token",
+      "user_id": 123
+    }
+
+POST /api/v1/auth/login
+  Request:
+    {
+      "email": "user@example.com",
+      "password": "password123"
+    }
+  Query Params:
+    - store_id: Store identifier
+  Response:
+    {
+      "access_token": "base64-encoded-auth-token",
+      "user_id": 123
     }
 ```
 
-**Auth-token Format (JWT):**
+**Auth-token Format (Base64-encoded JSON):**
 ```json
 {
-  "sub": "user-id",
-  "email": "user@example.com",
-  "iat": 1735308600,
-  "exp": 1735312200,
-  "iss": "auth-service"
+  "store_id": "store-1",
+  "user_id": 123,
+  "expired_at": "2025-12-27T16:00:00.000Z",
+  "signature": "hmac_sha256_hex_string"
 }
 ```
 
-**Shared Secret:**
+**Signature Generation:**
+```python
+# Create message from token data (sorted keys, without signature)
+message = json.dumps({
+    "store_id": "store-1",
+    "user_id": 123,
+    "expired_at": "2025-12-27T16:00:00.000Z"
+}, sort_keys=True)
+
+# Generate HMAC-SHA256 signature
+signature = hmac.new(
+    SIGNATURE_KEY.encode('utf-8'),
+    message.encode('utf-8'),
+    hashlib.sha256
+).hexdigest()  # lowercase hex string
+```
+
+**SIGNATURE_KEY:**
 - Symmetric key (HMAC-SHA256)
 - Stored in environment variable
-- Used to sign auth-tokens
-- Naglfar Validation Service uses same secret to verify
+- Used to sign auth-tokens (auth-service)
+- Used to verify auth-tokens (naglfar-validation)
 
 ---
 
@@ -1326,19 +1382,24 @@ volumes:
 
 1. ~~**Implement Naglfar Validation Service** (.NET)~~ ✅ COMPLETED
    - ~~YARP reverse proxy~~ ✅
-   - ~~Auth flow (e-token, auth-token)~~ ✅
+   - ~~Auth flow (e-token generation, auth-token validation)~~ ✅
    - ~~Redis pub/sub integration~~ ✅
-   - ~~Multi-store support~~ ✅
+   - ~~Multi-store support (10 stores)~~ ✅
+   - ~~AUTH-TOKEN signature validation (HMAC-SHA256)~~ ✅
+   - ~~AuthTokenValidator service~~ ✅
 
 1a. **Implement Redis Event Consumer**
    - Subscribe to naglfar-events channel
    - Process E-TOKEN generation events
    - Store events for analytics (Phase 2: Neo4j)
 
-2. **Implement Auth Service** (Python FastAPI)
-   - E-token validation
-   - JWT generation
-   - Shared secret management
+2. ~~**Implement Auth Service** (Python FastAPI)~~ ✅ COMPLETED
+   - ~~E-token validation~~ ✅
+   - ~~AUTH-TOKEN generation with HMAC-SHA256 signature~~ ✅
+   - ~~SIGNATURE_KEY management~~ ✅
+   - ~~User registration and login endpoints~~ ✅
+   - ~~Auto-authentication with test user~~ ✅
+   - TODO: Show login/register form instead of auto-auth
 
 3. **Implement Naglfar Worker** (.NET)
    - Kafka consumer

@@ -84,7 +84,6 @@ services:
       - "traefik.http.routers.auth-service.entrypoints=web"
       - "traefik.http.routers.auth-service.service=auth-service"
       - "traefik.http.services.auth-service.loadbalancer.server.port=8000"
-
   redis:
     image: "redis:8"
     container_name: redis

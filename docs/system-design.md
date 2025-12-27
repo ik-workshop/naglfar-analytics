@@ -264,9 +264,18 @@ Naglfar stores/processes:
 - YARP reverse proxy to backend services
 - Header-based authentication (AUTH-TOKEN, E-TOKEN)
 - E-TOKEN generation with base64-encoded JSON (expiry_date, store_id)
+- **AUTH-TOKEN validation with HMAC-SHA256 signature verification**
+- **AuthTokenValidator service in naglfar-validation**
 - Multi-store support (10 stores with store_id in paths)
+- Store_id extraction from request path and validation
 - Redis pub/sub for E-TOKEN events
-- CLIENT_IP header extraction
+- CLIENT_IP header extraction (header or connection fallback)
+- **Auth Service (Python FastAPI) with:**
+  - E-TOKEN validation (decode base64, check expiry)
+  - AUTH-TOKEN generation with HMAC-SHA256 signature
+  - User registration and login endpoints
+  - Auto-authentication with test user (TODO: login form)
+  - SIGNATURE_KEY shared secret management
 - Prometheus metrics endpoint
 - Health checks (liveness/readiness)
 - API versioning (v1)
@@ -274,7 +283,8 @@ Naglfar stores/processes:
 - Docker + Docker Compose deployment
 
 #### 🔄 In Progress
-- Redis event consumer/analytics
+- Redis event consumer/analytics (subscriber to naglfar-events channel)
+- Login/register UI form (currently auto-authenticates)
 - Threat detection algorithms
 - Rate limiting implementation
 - Account compromise detection

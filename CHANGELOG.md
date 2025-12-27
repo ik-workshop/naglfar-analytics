@@ -91,6 +91,133 @@ A lightweight .NET web application providing **health monitoring and analytics c
 
 ## Changelog
 
+### 2025-12-27 - AUTH-TOKEN Signature Validation & Complete Documentation
+
+#### Added
+- **✅ AUTH-TOKEN Signature Validation** (`services/naglfar-validation/src/NaglfartAnalytics/Services/`):
+  - **AuthTokenValidator Service** (`AuthTokenValidator.cs`):
+    - HMAC-SHA256 signature verification using shared SIGNATURE_KEY
+    - Base64 JSON decoding and validation
+    - Expiration timestamp checking (5-minute token lifetime)
+    - Store ID validation against request path
+    - User context enrichment (adds UserId and StoreId to HttpContext.Items)
+
+  - **AUTH-TOKEN Format** (Base64-encoded JSON):
+    ```json
+    {
+      "store_id": "store-1",
+      "user_id": 123,
+      "expired_at": "2025-12-27T16:00:00.000Z",
+      "signature": "hmac_sha256_hex_string"
+    }
+    ```
+
+  - **Signature Algorithm**:
+    - Message: `{"expired_at":"...","store_id":"...","user_id":123}` (snake_case, sorted keys)
+    - Algorithm: HMAC-SHA256 with shared SIGNATURE_KEY
+    - Output: Lowercase hexadecimal string (matches Python's `hmac.hexdigest()`)
+
+- **✅ Auth Service Complete Implementation** (`services/auth-service/src/routers/auth.py`):
+  - **E-TOKEN Validation**: Decodes base64, parses JSON, validates expiration
+  - **AUTH-TOKEN Generation**: Creates signed tokens with HMAC-SHA256
+  - **Signature Generation**:
+    ```python
+    message = json.dumps(token_data, sort_keys=True)
+    signature = hmac.new(
+        SIGNATURE_KEY.encode('utf-8'),
+        message.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+    ```
+  - **Auto-Authentication**: Temporary auto-login with test@example.com
+  - **Redirect Flow**: Returns AUTH-TOKEN header on redirect to return_url
+  - **Manual Endpoints**: `/api/v1/auth/authorize` (register), `/api/v1/auth/login`
+
+- **✅ Complete Sequence Diagram** (`docs/assets/diagrams/naglfar-validation/authentication-complete-sequence.mmd`):
+  - Shows entire authentication flow from initial request to authenticated access
+  - Includes E-TOKEN generation and Redis pub/sub
+  - Shows AUTH-TOKEN validation with signature verification
+  - Illustrates invalid/expired token handling
+  - Documents subsequent authenticated requests
+
+#### Changed
+- **✅ AuthenticationMiddleware Enhanced** (`AuthenticationMiddleware.cs:26-62`):
+  - **Method Signature** (line 26): Injects `AuthTokenValidator` service
+  - **AUTH-TOKEN Validation Flow** (lines 36-62):
+    1. Extract store_id from path
+    2. Check for AUTH-TOKEN header
+    3. If present: Validate signature, expiration, store_id
+    4. On success: Add UserId and StoreId to context, proxy to backend
+    5. On failure: Log warning, generate new E-TOKEN, redirect to auth-service
+
+- **✅ Program.cs Service Registration** (`Program.cs:54-55`):
+  ```csharp
+  // Register AUTH-TOKEN validator
+  builder.Services.AddSingleton<AuthTokenValidator>();
+  ```
+
+#### Documentation Updates
+- **✅ Architecture Documentation** (`docs/naglfar-layer-architecture.md`):
+  - Updated configuration to use `SIGNATURE_KEY` instead of `shared_secret`
+  - Added detailed AUTH-TOKEN validation implementation section
+  - Updated Auth Service section with actual API endpoints and signature logic
+  - Marked auth-service and AUTH-TOKEN validation as completed
+
+- **✅ Authentication Flow Diagrams**:
+  - `authentication-flow.mmd`: Completely rewritten with signature validation steps
+  - `request-processing-flow.mmd`: Added AUTH-TOKEN validation decision points
+  - Both show E-TOKEN as base64 JSON, not UUID
+  - Include Redis pub/sub event publishing
+  - Show complete auth-service interaction
+
+- **✅ System Design** (`system-design.md`):
+  - Updated implementation status with:
+    - AUTH-TOKEN validation with HMAC-SHA256
+    - AuthTokenValidator service
+    - Auth Service features (E-TOKEN validation, signature generation)
+    - Store_id extraction and validation
+
+- **✅ Service READMEs Updated**:
+  - **auth-service/README.md**:
+    - Added authentication redirect endpoint documentation
+    - Updated token model with AUTH-TOKEN format and signature generation
+    - Marked completed features (E-TOKEN validation, HMAC-SHA256, auto-auth)
+
+  - **naglfar-validation/README.md**:
+    - Updated E-TOKEN section with base64 JSON format
+    - Added AUTH-TOKEN validation process details
+    - Documented validation failure behavior
+    - Updated redirect flow examples with base64 tokens
+
+- **✅ Requirements Documentation** (`requirements.md`):
+  - Updated Redis sections with implementation details
+  - Added E-TOKEN and AUTH-TOKEN format specifications
+  - Documented SIGNATURE_KEY shared secret management
+  - Updated technology stack with authentication details
+
+#### Benefits
+- ✅ **Security**: Cryptographic signature verification prevents token tampering
+- ✅ **Validation**: Complete token validation (signature, expiration, store_id)
+- ✅ **Interoperability**: C# and Python implementations produce/verify compatible signatures
+- ✅ **User Context**: Authenticated requests include UserId and StoreId in context
+- ✅ **Graceful Degradation**: Invalid tokens trigger re-authentication, not errors
+- ✅ **Documentation**: Complete, accurate documentation of authentication system
+
+#### Technical Details
+- **Signature Key**: Shared SIGNATURE_KEY environment variable between services
+- **Token Expiration**: E-TOKEN (15 minutes), AUTH-TOKEN (5 minutes)
+- **Signature Compatibility**:
+  - Python: `hmac.hexdigest()` produces lowercase hex
+  - C#: `Convert.ToHexString().ToLower()` matches Python output
+- **Message Format**: JSON with snake_case keys, sorted alphabetically
+- **Store ID Extraction**: Parses path segments `/api/v1/{store_id}/...`
+- **Context Enrichment**: HttpContext.Items["UserId"] and HttpContext.Items["StoreId"]
+
+#### Security Fixes
+- **CRITICAL**: Fixed security vulnerability where ANY string was accepted as AUTH-TOKEN
+- **Before**: Only checked if AUTH-TOKEN header existed
+- **After**: Full signature verification, expiration check, store_id validation
+
 ### 2025-12-27 - Redis Pub/Sub Event Streaming & Multi-Store Support
 
 #### Added

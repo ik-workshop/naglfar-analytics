@@ -5,7 +5,7 @@ using NaglfartAnalytics.Services;
 namespace NaglfartAnalytics;
 
 /// <summary>
-/// Middleware that checks for AUTH-TOKEN header and creates E-TOKEN header if not present
+/// Middleware that validates AUTH-TOKEN header or creates E-TOKEN for unauthenticated requests
 /// </summary>
 public class AuthenticationMiddleware
 {
@@ -23,7 +23,7 @@ public class AuthenticationMiddleware
         _logger = logger;
     }
 
-    public async Task InvokeAsync(HttpContext context, IRedisPublisher redisPublisher)
+    public async Task InvokeAsync(HttpContext context, IRedisPublisher redisPublisher, AuthTokenValidator authTokenValidator)
     {
         // Skip auth check for infrastructure endpoints
         var path = context.Request.Path.Value?.ToLower() ?? "";
@@ -33,17 +33,38 @@ public class AuthenticationMiddleware
             return;
         }
 
+        // Extract store_id from path for validation
+        var storeId = ExtractStoreIdFromPath(path);
+
         // Check for AUTH-TOKEN header
         var authHeaderName = _configuration["Authentication:HeaderName"] ?? "AUTH-TOKEN";
-        var hasAuthToken = context.Request.Headers.ContainsKey(authHeaderName);
+        var authToken = context.Request.Headers[authHeaderName].FirstOrDefault();
 
-        if (!hasAuthToken)
+        if (!string.IsNullOrEmpty(authToken))
+        {
+            // Validate AUTH-TOKEN signature
+            if (authTokenValidator.ValidateAuthToken(authToken, storeId, out var tokenData))
+            {
+                // Token is valid - add user context to request
+                context.Items["UserId"] = tokenData!.UserId;
+                context.Items["StoreId"] = tokenData.StoreId;
+
+                _logger.LogInformation("Authenticated user {UserId} for store {StoreId}",
+                    tokenData.UserId, tokenData.StoreId);
+
+                // Continue with authenticated request
+                await _next(context);
+                return;
+            }
+
+            // Invalid token - treat as unauthenticated and generate new E-TOKEN
+            _logger.LogWarning("Invalid AUTH-TOKEN provided, generating new E-TOKEN");
+        }
+
+        // No valid AUTH-TOKEN - generate E-TOKEN
         {
             // Always generate new E-TOKEN (ephemeral token) - ignore any existing E-TOKEN
             var eTokenHeaderName = _configuration["Authentication:ETokenHeaderName"] ?? "E-TOKEN";
-
-            // Extract store_id from path (e.g., /api/v1/store-1/books -> store-1)
-            var storeId = ExtractStoreIdFromPath(path);
 
             // Create E-TOKEN as JSON with expiry and store_id, then base64 encode
             var eTokenData = new

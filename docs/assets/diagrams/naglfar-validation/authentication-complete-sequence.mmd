@@ -1,0 +1,83 @@
+sequenceDiagram
+    participant Client
+    participant Naglfar as Naglfar Validation
+    participant Redis
+    participant Auth as Auth Service
+    participant Backend as Book Store
+
+    Note over Client,Backend: Initial Unauthenticated Request
+
+    Client->>Naglfar: GET /api/v1/store-1/books
+    activate Naglfar
+    Note over Naglfar: Check AUTH-TOKEN header
+    Note over Naglfar: Not found
+
+    Note over Naglfar: Extract store_id from path<br/>Extract CLIENT_IP from header
+
+    Note over Naglfar: Generate E-TOKEN<br/>Base64({"expiry_date": "...",<br/>"store_id": "store-1"})
+
+    Naglfar->>Redis: PUBLISH naglfar-events<br/>{"client_ip": "...", "store_id": "store-1",<br/>"action": "e-token", "timestamp": "..."}
+    activate Redis
+    Redis-->>Naglfar: OK
+    deactivate Redis
+
+    Naglfar->>Client: 302 Redirect<br/>Location: /api/v1/auth?e_token=xxx&return_url=...<br/>E-TOKEN: xxx
+    deactivate Naglfar
+
+    Note over Client,Auth: Authentication Flow
+
+    Client->>Auth: GET /api/v1/auth?e_token=xxx&return_url=...
+    activate Auth
+    Note over Auth: Validate E-TOKEN:<br/>1. Decode Base64<br/>2. Parse JSON<br/>3. Check expiry_date
+
+    Note over Auth: Auto-authenticate with<br/>test@example.com<br/>(TODO: show login form)
+
+    Note over Auth: Generate AUTH-TOKEN:<br/>1. Create JSON: {store_id, user_id,<br/>expired_at +5min}<br/>2. Compute HMAC-SHA256 signature<br/>3. Add signature to JSON<br/>4. Base64 encode
+
+    Auth->>Client: 302 Redirect<br/>Location: return_url<br/>AUTH-TOKEN: base64_encoded_json
+    deactivate Auth
+
+    Note over Client,Backend: Authenticated Request
+
+    Client->>Naglfar: GET /api/v1/store-1/books<br/>AUTH-TOKEN: base64_encoded_json
+    activate Naglfar
+
+    Note over Naglfar: Extract store_id from path
+
+    Note over Naglfar: Validate AUTH-TOKEN:<br/>1. Decode Base64<br/>2. Parse JSON<br/>3. Verify HMAC-SHA256 signature<br/>4. Check expired_at<br/>5. Validate store_id matches path
+
+    Note over Naglfar: ✓ Valid<br/>Add UserId & StoreId to context
+
+    Naglfar->>Backend: GET /api/v1/store-1/books<br/>(proxied)
+    activate Backend
+    Backend-->>Naglfar: 200 OK<br/>{"books": [...]}
+    deactivate Backend
+
+    Naglfar-->>Client: 200 OK<br/>{"books": [...]}
+    deactivate Naglfar
+
+    Note over Client,Backend: Subsequent Requests (with cached AUTH-TOKEN)
+
+    Client->>Naglfar: GET /api/v1/store-1/books/123<br/>AUTH-TOKEN: base64_encoded_json
+    activate Naglfar
+    Note over Naglfar: Validate AUTH-TOKEN<br/>✓ Valid (not expired)
+    Naglfar->>Backend: GET /api/v1/store-1/books/123
+    activate Backend
+    Backend-->>Naglfar: 200 OK
+    deactivate Backend
+    Naglfar-->>Client: 200 OK
+    deactivate Naglfar
+
+    Note over Client,Backend: Invalid/Expired Token Scenario
+
+    Client->>Naglfar: GET /api/v1/store-1/cart<br/>AUTH-TOKEN: expired_or_invalid_token
+    activate Naglfar
+    Note over Naglfar: Validate AUTH-TOKEN<br/>✗ Invalid or Expired
+    Note over Naglfar: Generate new E-TOKEN
+    Naglfar->>Redis: PUBLISH naglfar-events
+    activate Redis
+    Redis-->>Naglfar: OK
+    deactivate Redis
+    Naglfar->>Client: 302 Redirect to Auth Service
+    deactivate Naglfar
+    Note over Client: Repeat authentication flow...
