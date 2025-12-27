@@ -6,15 +6,15 @@ architecture-beta
     group persistence(database)[Persistence Layer]
     group enforcement(shield)[Enforcement Layer]
 
-    service validation(server)[Validation Service<br/>Request Metadata] in sources
-    service bookstore(server)[Book Store<br/>User Actions] in sources
-    service kafka_validation(disk)[Kafka Topic<br/>naglfar-validation] in transport
-    service kafka_journey(disk)[Kafka Topic<br/>naglfar-journey] in transport
-    service worker(cogs)[Naglfar Worker<br/>Enrichment] in processing
-    service analytics(cogs)[Analytics Worker<br/>Pattern Detection] in processing
-    service neo4j(database)[Neo4j<br/>Graph Storage] in persistence
-    service redis(database)[Redis<br/>Block Lists] in persistence
-    service enforcer(shield)[Validation Service<br/>Block Enforcement] in enforcement
+    service validation(server)[Validation Service] in sources
+    service bookstore(server)[Book Store] in sources
+    service kafka_validation(disk)[Kafka Validation] in transport
+    service kafka_journey(disk)[Kafka Journey] in transport
+    service worker(cogs)[Naglfar Worker] in processing
+    service analytics(cogs)[Analytics Worker] in processing
+    service neo4j(database)[Neo4j] in persistence
+    service redis(database)[Redis] in persistence
+    service enforcer(shield)[Validation Service] in enforcement
 
     validation:B --> T:kafka_validation
     bookstore:B --> T:kafka_journey

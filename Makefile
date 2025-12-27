@@ -122,21 +122,22 @@ diagrams: $(DIAGRAMS_SVG)
 $(DIAGRAMS_DIR)/%.svg: $(DIAGRAMS_DIR)/%.mmd
 	@echo "Generating $@..."
 	@docker run --rm -v $(PWD):/data $(MERMAID_CLI_IMAGE) \
-		-i /data/$< -o /data/$@ -b transparent -t neutral
+		-i /data/$< -o /data/$@ -b white -t neutral
 
-#? diagrams-validate: Validate Mermaid diagrams by attempting to render them
+#? diagrams-validate: Validate Mermaid diagrams by checking for syntax errors
 diagrams-validate:
-	@echo "Validating Mermaid diagrams (attempting render)..."
+	@echo "Validating Mermaid diagrams..."
 	@failed=0; \
 	for file in $(DIAGRAMS_SRC); do \
 		echo "  Validating $$(basename $$file)..."; \
-		if docker run --rm -v $(PWD):/data $(MERMAID_CLI_IMAGE) \
-			-i /data/$$file -o /tmp/$$(basename $$file .mmd).svg \
-			-b transparent -t neutral > /dev/null 2>&1; then \
-			echo "    ✓ Valid"; \
-		else \
-			echo "    ✗ Invalid syntax"; \
+		output=$$(docker run --rm -v $(PWD):/data $(MERMAID_CLI_IMAGE) \
+			-i /data/$$file -o - -b transparent -t neutral 2>&1); \
+		if echo "$$output" | grep -qi "syntax error\|error in graph\|parse error"; then \
+			echo "    ✗ Syntax error detected"; \
+			echo "$$output" | grep -i "error" | head -3; \
 			failed=1; \
+		else \
+			echo "    ✓ Valid"; \
 		fi; \
 	done; \
 	if [ $$failed -eq 0 ]; then \

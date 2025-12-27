@@ -15,7 +15,8 @@
       "Bash(dotnet add:*)",
       "Bash(make diagrams-check:*)",
       "Bash(docker --version:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(make diagrams-validate:*)"
     ]
   }
 }

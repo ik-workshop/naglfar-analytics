@@ -54,11 +54,12 @@ make diagrams-validate
 ```
 
 This will:
-- Attempt to render each `.mmd` file to verify syntax
-- Report validation status for each diagram
-- Exit with error if any diagram has invalid syntax
+- Render each `.mmd` file and capture the output
+- Check for syntax error patterns in the output
+- Display error details if syntax errors are found
+- Exit with error code if any diagram is invalid
 
-**Note**: Validation works by attempting to render the diagram. If rendering succeeds, the syntax is valid.
+**How it works**: Renders to stdout and searches for error patterns like "Syntax error", "Error in graph", or "Parse error".
 
 ### Clean Generated Files
 ```bash

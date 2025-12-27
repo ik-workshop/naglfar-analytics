@@ -9,15 +9,15 @@ architecture-beta
     group storage(database)[Data Storage]
 
     service client(internet)[Client] in internet
-    service traefik(server)[Traefik v3.6] in gateway
-    service naglfar(shield)[Naglfar Validation<br/>.NET 10.0] in protection
-    service authsvc(lock)[Auth Service<br/>Python FastAPI] in auth
+    service traefik(server)[Traefik] in gateway
+    service naglfar(shield)[Naglfar Validation] in protection
+    service authsvc(lock)[Auth Service] in auth
     service bookus(server)[Book Store US] in backend
     service bookeu(server)[Book Store EU] in backend
     service kafka(disk)[Apache Kafka] in messaging
-    service worker(cogs)[Naglfar Worker<br/>.NET] in workers
+    service worker(cogs)[Naglfar Worker] in workers
     service analytics(cogs)[Analytics Worker] in workers
-    service neo4j(database)[Neo4j<br/>Graph DB] in storage
+    service neo4j(database)[Neo4j] in storage
     service redis(database)[Redis Cache] in storage
 
     client:R --> L:traefik
