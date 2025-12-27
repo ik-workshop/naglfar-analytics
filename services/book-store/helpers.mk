@@ -19,3 +19,22 @@ lock-dependencies-book-store: ## Generate Pipfile.lock using Docker (no local Py
 		$(PYTHON_IMAGE) \
 		bash -c "pip install --quiet --root-user-action ignore pipenv && pipenv lock --verbose"
 	@echo "✓ Pipfile.lock generated successfully in $(BOOK_STORE_DIR)/"
+
+test-book-store: ## Run pytest tests in Docker for book-store service
+	@echo "Running pytest tests for book-store service..."
+	@docker run --rm \
+		-v $(PWD)/$(BOOK_STORE_DIR):/app \
+		-w /app \
+		-e PYTHONPATH=/app/src \
+		python:3.14 \
+		bash -c "pip install --quiet pipenv && pipenv install --dev && pipenv run pytest -v"
+
+test-book-store-coverage: ## Run pytest with coverage for book-store service
+	@echo "Running pytest with coverage for book-store service..."
+	@docker run --rm \
+		-v $(PWD)/$(BOOK_STORE_DIR):/app \
+		-w /app \
+		-e PYTHONPATH=/app/src \
+		python:3.14 \
+		bash -c "pip install --quiet pipenv && pipenv install --dev && pipenv run pytest --cov=src/app --cov-report=term-missing --cov-report=html -v"
+	@echo "✓ Coverage report generated in $(BOOK_STORE_DIR)/htmlcov/"

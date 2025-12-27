@@ -91,6 +91,143 @@ A lightweight .NET web application providing **health monitoring and analytics c
 
 ## Changelog
 
+### 2025-12-27 - Book Store Service Complete Implementation & Refactoring
+
+#### Added
+- **✅ Complete FastAPI Book Store Service** (`services/book-store/src/`):
+  - **Application Structure** - Clean, flat directory organization:
+    - `app.py` - Main FastAPI application entry point (moved from src/app/main.py)
+    - `storage/` - Data layer (database.py, models.py)
+    - `routers/` - API endpoint modules (books, auth, cart, orders, inventory)
+    - `internal/` - Admin endpoints
+    - `abuse/` - Abuse detection system
+    - `dependencies.py` - Shared dependencies (authentication)
+
+  - **11 API Endpoints** across 5 routers:
+    - **Books** (`routers/books.py`): Browse books, filter by category, search
+    - **Authentication** (`routers/auth.py`): User registration and login
+    - **Cart** (`routers/cart.py`): Add/remove items, view cart
+    - **Orders** (`routers/orders.py`): Checkout, view orders, order history
+    - **Inventory** (`routers/inventory.py`): Check stock availability
+    - **Admin** (`internal/admin.py`): Database stats, reset database
+
+  - **In-Memory Database** (`storage/database.py`):
+    - Dictionary-based storage for books, users, carts, orders
+    - 11 pre-seeded books (Clean Code, Design Patterns, etc.)
+    - Test user: test@example.com / password123
+    - Token-based authentication with Bearer tokens
+    - SHA256 password hashing
+    - Stock management with automatic reduction on checkout
+
+  - **Pydantic Models** (`storage/models.py`):
+    - 17 request/response models with validation
+    - Email validation, field constraints
+    - Type-safe API contracts
+
+  - **Abuse Detection System** (`abuse/detector.py`):
+    - Middleware-based detection of 404 (Not Found) and 405 (Method Not Allowed)
+    - Logs client IP, method, path, status code, timestamp
+    - Simple logging approach (no blocking/rate limiting)
+
+  - **Comprehensive Test Suite** (`tests/`):
+    - **36 pytest tests** covering all functionality:
+      - `test_books.py` (5 tests) - List, filter, search, get by ID
+      - `test_auth.py` (7 tests) - Register, login, validation
+      - `test_inventory.py` (4 tests) - Stock checks, synchronization
+      - `test_cart.py` (10 tests) - CRUD operations, calculations
+      - `test_orders.py` (10 tests) - Checkout, order management
+    - Pytest fixtures for authentication, cart setup
+    - Database reset before each test for isolation
+    - FastAPI TestClient for in-memory testing
+
+  - **Docker-Based Testing** (`helpers.mk:23-40`):
+    - `test-book-store` - Run pytest in Docker (no local Python needed)
+    - `test-book-store-coverage` - Run tests with coverage reports
+    - Uses PYTHONPATH=/app/src for correct imports
+    - Generates HTML coverage reports in htmlcov/
+
+  - **Build Commands** (`helpers.mk`):
+    - `docker-build-book-store` - Build Docker image
+    - `docker-run-book-store` - Run container on port 8090
+    - `lock-dependencies-book-store` - Generate Pipfile.lock in Docker
+    - All commands work without local Python installation
+
+#### Changed
+- **✅ Application Structure Refactored**:
+  - **Before**: Nested structure with src/app/ containing all modules
+  - **After**: Flat structure with modules directly under src/
+    ```
+    src/
+    ├── app.py              # Main app (moved from app/main.py)
+    ├── storage/            # Data layer (moved from app/storage/)
+    ├── routers/            # API endpoints (moved from app/routers/)
+    ├── abuse/              # Abuse detection (moved from app/abuse/)
+    ├── internal/           # Admin endpoints (moved from app/internal/)
+    └── dependencies.py     # Shared deps (moved from app/dependencies.py)
+    ```
+
+  - **Import Simplification**: All imports updated
+    - Before: `from app.storage.database import db`
+    - After: `from storage.database import db`
+    - Affected files: app.py, dependencies.py, all routers, admin.py, conftest.py
+
+  - **Dockerfile Updated** (`Dockerfile:24`):
+    - CMD changed from `app.main:app` to `app:app`
+    - PYTHONPATH set to /app/src for correct module resolution
+
+  - **Test Configuration** (`tests/conftest.py`):
+    - Added sys.path manipulation to import from src/
+    - Updated imports to use new flat structure
+
+#### Added Features
+- **✅ Shopping Cart System**:
+  - Add items with quantity validation (1-10)
+  - Stock checking before adding to cart
+  - Cart aggregation with subtotals
+  - 8% tax calculation
+  - Automatic cart clearing on checkout
+
+- **✅ Order Processing**:
+  - Checkout validates cart and stock
+  - Reduces inventory on successful checkout
+  - Calculates subtotal, tax, total
+  - 5-day delivery estimation
+  - Order history per user
+
+- **✅ Authentication System**:
+  - JWT-like token generation (secrets.token_urlsafe)
+  - Bearer token authentication
+  - Password hashing with SHA256
+  - Auto-login on registration
+  - Token-based session management
+
+#### Documentation
+- **✅ Updated** (`docs/endpoints.md:24-257`):
+  - Added comprehensive curl examples for all book-store endpoints
+  - Direct access examples (port 8081)
+  - Traefik routing examples with Host headers
+  - Complete user journey example (register → browse → cart → checkout)
+  - Authentication flow examples
+
+#### Technical Details
+- **Python Version**: 3.14
+- **Framework**: FastAPI with Pydantic validation
+- **Testing**: pytest with coverage support
+- **Port Configuration**:
+  - Container: 8000 (internal)
+  - Docker run: 8090 (external mapping)
+  - Traefik routing: book-store-eu.local
+
+#### Benefits
+- ✅ Clean, maintainable directory structure
+- ✅ Simple, flat imports without app. prefix
+- ✅ Complete e-commerce API implementation
+- ✅ Comprehensive test coverage (36 tests)
+- ✅ Docker-based development (no local Python required)
+- ✅ Abuse detection logging
+- ✅ Production-ready authentication
+- ✅ In-memory storage for fast development iteration
+
 ### 2025-12-27 - Monorepo Restructuring
 
 #### Changed

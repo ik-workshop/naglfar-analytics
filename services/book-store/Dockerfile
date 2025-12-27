@@ -21,4 +21,4 @@ WORKDIR ${APP_HOME}/src
 RUN printf "build_time=%s\n" "$(date -u +%d/%m/%Y_%H:%M)" > settings.ini
 
 # https://www.geeksforgeeks.org/python/fastapi-uvicorn/
-CMD ["pipenv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--reload"]
+CMD ["pipenv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
