@@ -17,6 +17,20 @@ class Database:
         self.order_items: Dict[int, List[dict]] = {}  # order_id -> list of items
         self.tokens: Dict[str, int] = {}  # token -> user_id
 
+        # Store locations (store_id -> capital city)
+        self.stores: Dict[str, str] = {
+            "store-1": "London",
+            "store-2": "Paris",
+            "store-3": "Berlin",
+            "store-4": "Madrid",
+            "store-5": "Rome",
+            "store-6": "Amsterdam",
+            "store-7": "Vienna",
+            "store-8": "Brussels",
+            "store-9": "Copenhagen",
+            "store-10": "Stockholm"
+        }
+
         # Counters for IDs
         self.next_book_id = 1
         self.next_user_id = 1
@@ -324,6 +338,14 @@ class Database:
     def get_user_orders(self, user_id: int) -> List[dict]:
         """Get all orders for a user"""
         return [order for order in self.orders.values() if order["user_id"] == user_id]
+
+    def is_valid_store(self, store_id: str) -> bool:
+        """Check if store_id is valid"""
+        return store_id in self.stores
+
+    def get_store_location(self, store_id: str) -> Optional[str]:
+        """Get location (capital city) for a store"""
+        return self.stores.get(store_id)
 
 
 # Global database instance

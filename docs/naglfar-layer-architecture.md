@@ -157,14 +157,17 @@ Shows the complete Naglfar protection system with all components: API Gateway (T
 
 **Tech Stack:**
 - .NET 10.0
-- YARP (Yet Another Reverse Proxy) or custom proxy
-- Kafka producer (Confluent.Kafka)
-- Redis client (StackExchange.Redis)
-- Bloom filter library (optional)
+- YARP (Yet Another Reverse Proxy)
+- Redis client (StackExchange.Redis 2.10.1)
+- Redis pub/sub for event streaming
+- Prometheus metrics (prometheus-net)
+- Bloom filter library (optional - future)
 
 **Configuration Flags:**
 ```yaml
 redis:
+  connection_string: "redis:6379"  # Redis connection
+  channel: "naglfar-events"  # Pub/sub channel for E-TOKEN events
   mode: raw  # or "bloom-filter"
   ttl: 300   # 5 minutes in seconds
 
@@ -172,25 +175,55 @@ blocking:
   e_token_block_duration: 300  # 5 minutes
   auth_token_block_duration: 300  # 5 minutes
 
-auth:
+authentication:
+  header_name: "AUTH-TOKEN"  # Auth token header
+  e_token_header_name: "E-TOKEN"  # Ephemeral token header
   shared_secret: "${SHARED_SECRET}"  # shared with Auth Service
   auth_service_url: "http://auth-service/validate"
 
 backend:
   regions:
-    - url: "http://bookstore-us"
-      weight: 50
-    - url: "http://bookstore-eu"
-      weight: 50
+    - url: "http://protected-service-eu:8000"
+      weight: 100
   load_balancing: "round-robin"  # or "random", "weighted"
+
+stores:
+  # Multi-store support with capital city locations
+  store-1: "London"
+  store-2: "Paris"
+  store-3: "Berlin"
+  store-4: "Madrid"
+  store-5: "Rome"
+  store-6: "Amsterdam"
+  store-7: "Vienna"
+  store-8: "Brussels"
+  store-9: "Copenhagen"
+  store-10: "Stockholm"
 ```
 
 **Key Operations:**
 
 1. **E-TOKEN Generation:**
-   - Generate cryptographically secure random token (UUID)
+   - Extract store_id from request path (e.g., /api/v1/store-1/books)
+   - Extract CLIENT_IP from header (or use connection IP as fallback)
+   - Generate base64-encoded JSON E-TOKEN:
+     ```json
+     {
+       "expiry_date": "2025-12-27T15:45:00.000Z",
+       "store_id": "store-1"
+     }
+     ```
    - **ALWAYS create new** - ignore any existing E-TOKEN (prevents session fixation)
    - Set E-TOKEN as response header
+   - **Publish event to Redis pub/sub** (channel: naglfar-events):
+     ```json
+     {
+       "client_ip": "203.0.113.42",
+       "store_id": "store-1",
+       "action": "e-token",
+       "timestamp": "2025-12-27T15:30:00.000Z"
+     }
+     ```
    - Return 302 redirect to Auth Service with e_token query parameter
 
 2. **AUTH-TOKEN Validation:**
@@ -1291,11 +1324,16 @@ volumes:
 
 ## Next Steps
 
-1. **Implement Naglfar Validation Service** (.NET)
-   - YARP reverse proxy
-   - Auth flow (e-token, auth-token)
-   - Redis integration
-   - Kafka producer
+1. ~~**Implement Naglfar Validation Service** (.NET)~~ ✅ COMPLETED
+   - ~~YARP reverse proxy~~ ✅
+   - ~~Auth flow (e-token, auth-token)~~ ✅
+   - ~~Redis pub/sub integration~~ ✅
+   - ~~Multi-store support~~ ✅
+
+1a. **Implement Redis Event Consumer**
+   - Subscribe to naglfar-events channel
+   - Process E-TOKEN generation events
+   - Store events for analytics (Phase 2: Neo4j)
 
 2. **Implement Auth Service** (Python FastAPI)
    - E-token validation

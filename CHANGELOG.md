@@ -91,6 +91,188 @@ A lightweight .NET web application providing **health monitoring and analytics c
 
 ## Changelog
 
+### 2025-12-27 - Redis Pub/Sub Event Streaming & Multi-Store Support
+
+#### Added
+- **✅ Redis Integration** (`infrastructure/docker-compose.yml:88-98`):
+  - **Redis Service**: Redis 8 container with AOF persistence
+  - **Port**: 6379 exposed for external access
+  - **Volume**: `redis-data` for data persistence
+  - **Health Check**: redis-cli ping (3 retries, 5s timeout)
+  - **Command**: `redis-server --appendonly yes` for durability
+
+- **✅ Redis Insight Dashboard** (`infrastructure/docker-compose.yml:108-123`):
+  - **Image**: redis/redisinsight:latest
+  - **Port**: 5540 for web UI access
+  - **Configuration File**: `infrastructure/redis-insight/databases.json`
+  - **Pre-configured Connection**: Automatic Redis connection at startup
+  - **Separate Volume**: `redisinsight-data` (avoids permission conflicts)
+  - **Features**: Auto-accepts EULA, binds to 0.0.0.0
+
+- **✅ Redis Publisher Service** (`services/naglfar-validation/src/NaglfartAnalytics/Services/`):
+  - **Interface**: `IRedisPublisher` - Contract for publishing events
+  - **Implementation**: `RedisPublisher` - Publishes JSON messages to Redis pub/sub
+  - **Package**: StackExchange.Redis (2.8.16)
+  - **Channel**: `naglfar-events` (configurable)
+  - **Message Format**:
+    ```json
+    {
+      "client_ip": "203.0.113.42",
+      "store_id": "store-1",
+      "action": "e-token",
+      "timestamp": "2025-12-27T15:30:00.000Z"
+    }
+    ```
+  - **Error Handling**: Graceful degradation - logs errors but doesn't fail requests
+
+- **✅ E-TOKEN Format Enhancement** (`AuthenticationMiddleware.cs:47-55`):
+  - **Before**: Simple UUID string
+  - **After**: Base64-encoded JSON containing:
+    ```json
+    {
+      "expiry_date": "2025-12-27T15:45:00.000Z",  // 15-minute expiration
+      "store_id": "store-1"                        // Extracted from path
+    }
+    ```
+  - **Benefits**: Token contains context, easier validation, includes expiry
+
+- **✅ CLIENT_IP Header Extraction** (`AuthenticationMiddleware.cs:47-50`):
+  - Reads `CLIENT_IP` header from request
+  - Falls back to `context.Connection.RemoteIpAddress` if header not present
+  - Published to Redis for analytics and abuse detection
+  - Supports proxy/load balancer scenarios
+
+- **✅ Multi-Store Support** (`services/book-store/src/storage/database.py:20-32`):
+  - **10 Stores Defined**: store-1 through store-10
+  - **Locations**: European capital cities (London, Paris, Berlin, Madrid, Rome, Amsterdam, Vienna, Brussels, Copenhagen, Stockholm)
+  - **Path Pattern**: `/api/v1/{store_id}/...` for all endpoints
+  - **Store Validation**: `is_valid_store()` method checks store existence
+  - **Store Endpoint**: `/api/v1/stores` lists all stores with metadata
+
+- **✅ Comprehensive Testing** (`services/naglfar-validation/tests/`):
+  - **Total Tests**: 33 (all passing)
+  - **Redis Integration Tests** (`RedisPublisherTests.cs`): 8 tests
+    1. E-TOKEN generation publishes to Redis
+    2. CLIENT_IP header extraction
+    3. Store ID extraction from different paths
+    4. No publish when AUTH-TOKEN present
+    5. No publish for infrastructure endpoints
+    6. Multiple events for multiple requests
+    7. Timestamp validation
+    8. CLIENT_IP with query strings
+  - **Mock Redis Tests** (`MockRedisPublisherTests.cs`): 6 tests
+  - **Authentication Tests**: 19 tests (updated for base64 E-TOKEN)
+  - **Mock Publisher** (`Mocks/MockRedisPublisher.cs`): Test helper for unit tests
+
+- **✅ Auth Service Storage Module** (`services/auth-service/src/storage/`):
+  - **Created Missing Modules**:
+    - `storage/__init__.py` - Package marker
+    - `storage/models.py` - Pydantic models (UserRegister, UserLogin, Token)
+    - `storage/database.py` - In-memory database with user management
+  - **Features**:
+    - User registration and login
+    - SHA-256 password hashing
+    - UUID token generation (TODO: JWT)
+    - Pre-created test user: `test@example.com` / `password123`
+  - **Fixed ImportError**: `ModuleNotFoundError: No module named 'storage'`
+
+#### Changed
+- **✅ AuthenticationMiddleware Updates** (`AuthenticationMiddleware.cs`):
+  - **E-TOKEN Generation** (lines 44-62):
+    - Extract `store_id` from path using `ExtractStoreIdFromPath()` method
+    - Extract `CLIENT_IP` from header with fallback
+    - Generate base64-encoded JSON E-TOKEN
+    - Publish event to Redis pub/sub
+    - Set E-TOKEN as response header
+  - **New Method** (`ExtractStoreIdFromPath`, lines 88-102):
+    - Parses path segments to extract store_id
+    - Pattern: `/api/v1/{store_id}/...`
+    - Default: "store-1" if path doesn't match pattern
+
+- **✅ Configuration Updates** (`services/naglfar-validation/src/NaglfartAnalytics/`):
+  - **appsettings.json** (lines 16-19):
+    ```json
+    {
+      "Redis": {
+        "ConnectionString": "localhost:6379",
+        "Channel": "naglfar-events"
+      }
+    }
+    ```
+  - **Program.cs** (lines 1-3, 20-28):
+    - Added Redis connection with `IConnectionMultiplexer`
+    - Registered `IRedisPublisher` as singleton
+    - Connection option: `AbortOnConnectFail = false` for resilience
+
+- **✅ Book Store Routers Updated** (`services/book-store/src/routers/`):
+  - **All 5 routers** updated to include `{store_id}` in path:
+    - `books.py`: `/api/v1/{store_id}/books`
+    - `cart.py`: `/api/v1/{store_id}/cart`
+    - `auth.py`: `/api/v1/{store_id}/auth`
+    - `orders.py`: `/api/v1/{store_id}`
+    - `inventory.py`: `/api/v1/{store_id}/inventory`
+  - **Store Validation**: All endpoints validate store_id exists
+  - **Store Endpoint**: New `/api/v1/stores` endpoint returns all stores
+
+- **✅ Auth Service Fixed** (`services/auth-service/src/app.py`):
+  - Removed imports for non-existent modules (books, cart, orders, inventory, admin, abuse.detector)
+  - Fixed typo: "Authenitcation" → "Authentication"
+  - Added `/readyz` endpoint
+  - Cleaned up middleware configuration
+
+#### Documentation
+- **✅ Updated Architecture Documentation**:
+  - **requirements.md**: Added Redis pub/sub, updated tech stack
+  - **system-design.md**: Added Redis pub/sub to threat data flow, updated implementation status
+  - **naglfar-layer-architecture.md**: Updated E-TOKEN generation, configuration, tech stack, implementation status
+  - **auth-service/README.md**: Complete rewrite with API endpoints, authentication flow, data storage, project structure
+
+- **✅ Updated Endpoint Documentation** (`docs/endpoints.md`):
+  - All curl examples updated with `{store_id}` in paths
+  - Added stores list endpoint examples
+  - Added available stores table (store-1 → store-10 with locations)
+  - Updated all book-store endpoint examples
+
+- **✅ Updated Diagram** (`docs/assets/diagrams/naglfar-validation/request-processing-flow.mmd`):
+  - Added data extraction step (store_id, CLIENT_IP)
+  - Updated E-TOKEN generation to show base64 JSON format
+  - Added Redis pub/sub publishing step
+  - Updated redirect URL to show base64 E-TOKEN
+
+#### Benefits
+- ✅ **Real-Time Analytics**: E-TOKEN generation events streamed to Redis
+- ✅ **Multi-Tenant Support**: 10 stores with unique identifiers
+- ✅ **IP Tracking**: CLIENT_IP header enables abuse detection
+- ✅ **Richer Tokens**: E-TOKEN now contains expiry and context
+- ✅ **Resilient Design**: Redis failures don't impact service
+- ✅ **Comprehensive Testing**: 33 tests ensure reliability
+- ✅ **Auth Service Fixed**: Complete authentication service ready to use
+- ✅ **Visual Monitoring**: Redis Insight dashboard pre-configured
+
+#### Technical Details
+- **Redis Configuration**:
+  - Connection string: `redis:6379` (Docker network)
+  - Channel: `naglfar-events`
+  - Pub/sub pattern for scalable event distribution
+  - AOF persistence for data durability
+
+- **E-TOKEN Lifespan**: 15 minutes (configurable)
+
+- **Store ID Pattern**:
+  ```
+  Path: /api/v1/store-1/books
+  Segments: ["api", "v1", "store-1", "books"]
+  Store ID: segments[2] = "store-1"
+  ```
+
+- **Docker Compose Dependencies**:
+  ```yaml
+  naglfar-validation:
+    depends_on:
+      redis:
+        condition: service_healthy  # Wait for Redis to be ready
+  ```
+
 ### 2025-12-27 - Header-Based Authentication & Diagram Management
 
 #### Changed

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "Redis Local",
+    "host": "redis",
+    "port": 6379,
+    "connectionType": "STANDALONE"
+  }
+]

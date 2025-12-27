@@ -33,9 +33,12 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8000
       - SIGNATURE_KEY="0064283c-e357-11f0-b060-6e04387dcc74"
+      - Redis__ConnectionString=redis:6379
     restart: unless-stopped
     networks:
     - naglfar-network
+    depends_on:
+      - redis
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.apivone.rule=Host(`api.local`)"
@@ -82,16 +85,45 @@ services:
       - "traefik.http.routers.auth-service.service=auth-service"
       - "traefik.http.services.auth-service.loadbalancer.server.port=8000"
 
-  # whoami:
-  #   image: "traefik/whoami"
-  #   container_name: whoami
-  #   restart: unless-stopped
-  #   networks:
-  #     - naglfar-network
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.whoami.rule=Host(`whoami.local`)"
-  #     - "traefik.http.routers.whoami.entrypoints=web"
+  redis:
+    image: "redis:8"
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - naglfar-network
+    # We’ve enabled persistence in Redis by using the append-only file (AOF) feature.
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    # healthcheck:
+    #   test:
+    #     - CMD
+    #     - redis-cli
+    #     - ping
+    #   retries: 3
+    #   timeout: 5s
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: redis-insight
+    restart: always
+    ports:
+      - "5540:5540"
+    networks:
+      - naglfar-network
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDISINSIGHT_HOST=0.0.0.0
+      - REDISINSIGHT_ACCEPT_LICENSE=true  # Accept EULA and Privacy Settings
+    volumes:
+      - redisinsight-data:/data
+      - ./redis-insight/databases.json:/data/databases/databases.json:ro
+    # depends_on:
+    #   redis:
+    #     condition: service_healthy
 
 networks:
   naglfar-network:
@@ -100,3 +132,9 @@ networks:
   # proxy:
   #   external: true
   #   driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  redisinsight-data:
+    driver: local

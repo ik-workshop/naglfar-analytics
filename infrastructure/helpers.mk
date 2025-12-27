@@ -16,5 +16,6 @@ compose-logs: ## Stop and remove docker-compose containers
 	@echo "Showing docker-compose logs..."
 	docker-compose -f $(INFRASTRUCTURE_DIR)/docker-compose.yml logs -f
 
-apigw-restart: ## Rebuild and restart API Gateway (Traefik) service
+compose-restart: ## Rebuild and restart multiple services
 	@docker compose -f $(INFRASTRUCTURE_DIR)/docker-compose.yml up -d --build api-gateway
+	@docker compose -f $(INFRASTRUCTURE_DIR)/docker-compose.yml up -d --build redis-insight

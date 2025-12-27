@@ -1,4 +1,6 @@
 using Prometheus;
+using StackExchange.Redis;
+using NaglfartAnalytics.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +38,18 @@ builder.Services.AddSwaggerGen(options =>
 
 // Add health checks
 builder.Services.AddHealthChecks();
+
+// Add Redis connection
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var configuration = ConfigurationOptions.Parse(redisConnectionString);
+    configuration.AbortOnConnectFail = false; // Don't fail if Redis is unavailable
+    return ConnectionMultiplexer.Connect(configuration);
+});
+
+// Register Redis publisher service
+builder.Services.AddSingleton<IRedisPublisher, RedisPublisher>();
 
 // Add YARP reverse proxy
 builder.Services.AddReverseProxy()

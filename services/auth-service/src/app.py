@@ -1,10 +1,7 @@
-"""Main FastAPI application for Book Store"""
-from fastapi import FastAPI, Request
+"""Main FastAPI application for Auth Service"""
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from routers import books, auth, cart, orders, inventory
-from internal import admin
-from abuse.detector import log_abuse_attempt
+from routers import auth
 
 app = FastAPI(
     title="Auth Service API",
@@ -23,9 +20,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Abuse detection middleware
-# app.add_middleware(AbuseDetectionMiddleware)
-
 # Include routers
 app.include_router(auth.router)
 
@@ -34,7 +28,7 @@ app.include_router(auth.router)
 async def root():
     """Root endpoint"""
     return {
-        "service": "Authenitcation Service API",
+        "service": "Authentication Service API",
         "version": "0.1.0",
         "status": "running",
         "docs": "/docs"
@@ -45,6 +39,13 @@ async def root():
 async def health_check():
     """Health check endpoint for Kubernetes liveness probe"""
     return {"status": "healthy"}
+
+
+@app.get("/readyz")
+async def readiness_check():
+    """Readiness check endpoint for Kubernetes readiness probe"""
+    return {"status": "ready"}
+
 
 if __name__ == "__main__":
     import uvicorn

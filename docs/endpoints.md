@@ -2,6 +2,9 @@
 
 ## Infrastructure Endpoints (Unversioned)
 
+- Redis http://localhost:5540/
+- Traefik http://localhost:8080/dashboard/
+
 These endpoints are used for health checks and monitoring:
 
 ## API
@@ -38,45 +41,63 @@ The naglfar-validation service acts as a smart gateway:
 
 All book-store endpoints are automatically accessible through the API gateway at `api.local`:
 
+**Note:** All endpoints now require a `{store_id}` in the path (e.g., `store-1`, `store-2`, ... `store-10`).
+
 ```sh
-# Books
-curl -H "Host: api.local" http://localhost/api/v1/books
-curl -H "Host: api.local" "http://localhost/api/v1/books?category=programming"
-curl -H "Host: api.local" http://localhost/api/v1/books/1
+# List all stores
+curl -H "Host: api.local" http://localhost/api/v1/stores
 
-# Inventory
-curl -H "Host: api.local" http://localhost/api/v1/inventory
-curl -H "Host: api.local" "http://localhost/api/v1/inventory?book_id=1"
+# Books (using store-1)
+curl -H "Host: api.local" http://localhost/api/v1/store-1/books
+curl -H "Host: api.local" "http://localhost/api/v1/store-1/books?category=programming"
+curl -H "Host: api.local" http://localhost/api/v1/store-1/books/1
 
-# Authentication
-curl -X POST -H "Host: api.local" http://localhost/api/v1/auth/register \
+# Inventory (using store-2)
+curl -H "Host: api.local" http://localhost/api/v1/store-2/inventory
+curl -H "Host: api.local" "http://localhost/api/v1/store-2/inventory?book_id=1"
+
+# Authentication (using store-1)
+curl -X POST -H "Host: api.local" http://localhost/api/v1/store-1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "password123"}'
 
-curl -X POST -H "Host: api.local" http://localhost/api/v1/auth/login \
+curl -X POST -H "Host: api.local" http://localhost/api/v1/store-1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}'
 
-# Cart (requires authentication)
+# Cart (requires authentication, using store-1)
 TOKEN="your-token-here"
-curl -H "Host: api.local" -H "Authorization: Bearer $TOKEN" http://localhost/api/v1/cart
+curl -H "Host: api.local" -H "Authorization: Bearer $TOKEN" http://localhost/api/v1/store-1/cart
 
 curl -X POST -H "Host: api.local" -H "Authorization: Bearer $TOKEN" \
-  http://localhost/api/v1/cart/items \
+  http://localhost/api/v1/store-1/cart/items \
   -H "Content-Type: application/json" \
   -d '{"book_id": 1, "quantity": 2}'
 
-# Orders (requires authentication)
+# Orders (requires authentication, using store-1)
 curl -X POST -H "Host: api.local" -H "Authorization: Bearer $TOKEN" \
-  http://localhost/api/v1/checkout \
+  http://localhost/api/v1/store-1/checkout \
   -H "Content-Type: application/json" \
   -d '{"payment_method": "card_ending_1234"}'
 
 curl -H "Host: api.local" -H "Authorization: Bearer $TOKEN" \
-  http://localhost/api/v1/orders
+  http://localhost/api/v1/store-1/orders
 
 curl -H "Host: api.local" -H "Authorization: Bearer $TOKEN" \
-  http://localhost/api/v1/orders/1
+  http://localhost/api/v1/store-1/orders/1
+```
+
+**Available Stores:**
+- `store-1` → London
+- `store-2` → Paris
+- `store-3` → Berlin
+- `store-4` → Madrid
+- `store-5` → Rome
+- `store-6` → Amsterdam
+- `store-7` → Vienna
+- `store-8` → Brussels
+- `store-9` → Copenhagen
+- `store-10` → Stockholm
 ```
 
 ### Health and Infrastructure
@@ -101,81 +122,81 @@ curl -H "Host: book-store-eu.local" http://localhost/docs
 
 **Via API Gateway (api.local) - Recommended:**
 ```sh
-curl -H "Host: api.local" http://localhost/api/v1/books
-curl -H "Host: api.local" "http://localhost/api/v1/books?category=programming"
-curl -H "Host: api.local" "http://localhost/api/v1/books?search=Clean"
-curl -H "Host: api.local" http://localhost/api/v1/books/1
+curl -H "Host: api.local" http://localhost/api/v1/store-1/books
+curl -H "Host: api.local" "http://localhost/api/v1/store-1/books?category=programming"
+curl -H "Host: api.local" "http://localhost/api/v1/store-1/books?search=Clean"
+curl -H "Host: api.local" http://localhost/api/v1/store-1/books/1
 ```
 
 **List all books (Direct):**
 ```sh
-curl http://localhost:8081/api/v1/books
+curl http://localhost:8081/api/v1/store-1/books
 ```
 
 **List books by category (Direct):**
 ```sh
-curl -H "Host: book-store-eu.local" "http://localhost/api/v1/books?category=programming" | jq
+curl -H "Host: book-store-eu.local" "http://localhost/api/v1/store-1/books?category=programming" | jq
 ```
 
 **Search books (Direct):**
 ```sh
-curl -H "Host: book-store-eu.local" "http://localhost/api/v1/books?search=Clean"
+curl -H "Host: book-store-eu.local" "http://localhost/api/v1/store-1/books?search=Clean"
 ```
 
 **Get specific book (Direct):**
 ```sh
-curl http://localhost:8090/api/v1/books/1
+curl http://localhost:8090/api/v1/store-1/books/1
 ```
 
 **Via Traefik:**
 ```sh
-curl -H "Host: book-store-eu.local" http://localhost/api/v1/books | jq
-curl -H "Host: book-store-eu.local" "http://localhost/api/v1/books?category=programming" | jq
-curl -H "Host: book-store-eu.local" "http://localhost/api/v1/books?search=Clean" | jq
-curl -H "Host: book-store-eu.local" http://localhost/api/v1/books/1 | jq
+curl -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/books | jq
+curl -H "Host: book-store-eu.local" "http://localhost/api/v1/store-1/books?category=programming" | jq
+curl -H "Host: book-store-eu.local" "http://localhost/api/v1/store-1/books?search=Clean" | jq
+curl -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/books/1 | jq
 ```
 
 ### Inventory Endpoints
 
 **Check all inventory (Direct):**
 ```sh
-curl http://localhost:8090/api/v1/inventory
+curl http://localhost:8090/api/v1/store-1/inventory
 ```
 
 **Check specific book inventory (Direct):**
 ```sh
-curl "http://localhost:8090/api/v1/inventory?book_id=1"
+curl "http://localhost:8090/api/v1/store-1/inventory?book_id=1"
 ```
 
 **Via Traefik:**
 ```sh
-curl -H "Host: book-store-eu.local" http://localhost/api/v1/inventory
-curl -H "Host: book-store-eu.local" "http://localhost/api/v1/inventory?book_id=1"
+curl -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/inventory
+curl -H "Host: book-store-eu.local" "http://localhost/api/v1/store-1/inventory?book_id=1"
 ```
 
 ### Authentication Endpoints
 
 **Register new user (Direct):**
 ```sh
-curl -X POST http://localhost:8090/api/v1/auth/register \
+curl -X POST http://localhost:8090/api/v1/store-1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "password123"}'
 ```
 
 **Login (Direct):**
 ```sh
-curl -X POST http://localhost:8090/api/v1/auth/login \
+curl -X POST http://localhost:8090/api/v1/store-1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}'
 ```
 
 **Via Traefik:**
 ```sh
-curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/auth/register \
+curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "password123"}'
 
-curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/auth/login \
+curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "password": "password123"}'
 ```
@@ -185,14 +206,14 @@ curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/auth/login \
 **Get cart (Direct):**
 ```sh
 TOKEN="your-auth-token-here"
-curl http://localhost:8090/api/v1/cart \
+curl http://localhost:8090/api/v1/store-1/cart \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 **Add item to cart (Direct):**
 ```sh
 TOKEN="your-auth-token-here"
-curl -X POST http://localhost:8090/api/v1/cart/items \
+curl -X POST http://localhost:8090/api/v1/store-1/cart/items \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"book_id": 1, "quantity": 2}'
@@ -202,23 +223,23 @@ curl -X POST http://localhost:8090/api/v1/cart/items \
 ```sh
 TOKEN="your-auth-token-here"
 CART_ITEM_ID=1
-curl -X DELETE http://localhost:8090/api/v1/cart/items/$CART_ITEM_ID \
+curl -X DELETE http://localhost:8090/api/v1/store-1/cart/items/$CART_ITEM_ID \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 **Via Traefik:**
 ```sh
 TOKEN="your-auth-token-here"
-curl -H "Host: book-store-eu.local" http://localhost/api/v1/cart \
+curl -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/cart \
   -H "Authorization: Bearer $TOKEN"
 
-curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/cart/items \
+curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/cart/items \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"book_id": 1, "quantity": 2}'
 
 CART_ITEM_ID=1
-curl -X DELETE -H "Host: book-store-eu.local" http://localhost/api/v1/cart/items/$CART_ITEM_ID \
+curl -X DELETE -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/cart/items/$CART_ITEM_ID \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -227,7 +248,7 @@ curl -X DELETE -H "Host: book-store-eu.local" http://localhost/api/v1/cart/items
 **Checkout (Create Order) (Direct):**
 ```sh
 TOKEN="your-auth-token-here"
-curl -X POST http://localhost:8090/api/v1/checkout \
+curl -X POST http://localhost:8090/api/v1/store-1/checkout \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"payment_method": "card_ending_1234"}'
@@ -237,30 +258,30 @@ curl -X POST http://localhost:8090/api/v1/checkout \
 ```sh
 TOKEN="your-auth-token-here"
 ORDER_ID=1
-curl http://localhost:8090/api/v1/orders/$ORDER_ID \
+curl http://localhost:8090/api/v1/store-1/orders/$ORDER_ID \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 **List all orders (Direct):**
 ```sh
 TOKEN="your-auth-token-here"
-curl http://localhost:8090/api/v1/orders \
+curl http://localhost:8090/api/v1/store-1/orders \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 **Via Traefik:**
 ```sh
 TOKEN="your-auth-token-here"
-curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/checkout \
+curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/checkout \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"payment_method": "card_ending_1234"}'
 
 ORDER_ID=1
-curl -H "Host: book-store-eu.local" http://localhost/api/v1/orders/$ORDER_ID \
+curl -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/orders/$ORDER_ID \
   -H "Authorization: Bearer $TOKEN"
 
-curl -H "Host: book-store-eu.local" http://localhost/api/v1/orders \
+curl -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/orders \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -268,7 +289,7 @@ curl -H "Host: book-store-eu.local" http://localhost/api/v1/orders \
 
 ```sh
 # 1. Register a new user
-RESPONSE=$(curl -s -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/auth/register \
+RESPONSE=$(curl -s -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "newuser@example.com", "password": "securepass123"}')
 
@@ -277,23 +298,23 @@ TOKEN=$(echo $RESPONSE | jq -r '.access_token')
 echo "Token: $TOKEN"
 
 # 2. Browse books
-curl -H "Host: book-store-eu.local" "http://localhost/api/v1/books?category=programming"
+curl -H "Host: book-store-eu.local" "http://localhost/api/v1/store-1/books?category=programming"
 
 # 3. Check inventory for specific book
-curl -H "Host: book-store-eu.local" "http://localhost/api/v1/inventory?book_id=1"
+curl -H "Host: book-store-eu.local" "http://localhost/api/v1/store-1/inventory?book_id=1"
 
 # 4. Add book to cart
-curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/cart/items \
+curl -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/cart/items \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"book_id": 1, "quantity": 2}'
 
 # 5. View cart
-curl -H "Host: book-store-eu.local" http://localhost/api/v1/cart \
+curl -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/cart \
   -H "Authorization: Bearer $TOKEN"
 
 # 6. Checkout
-ORDER_RESPONSE=$(curl -s -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/checkout \
+ORDER_RESPONSE=$(curl -s -X POST -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/checkout \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"payment_method": "card_ending_1234"}')
@@ -303,7 +324,7 @@ ORDER_ID=$(echo $ORDER_RESPONSE | jq -r '.id')
 echo "Order ID: $ORDER_ID"
 
 # 7. Get order details
-curl -H "Host: book-store-eu.local" http://localhost/api/v1/orders/$ORDER_ID \
+curl -H "Host: book-store-eu.local" http://localhost/api/v1/store-1/orders/$ORDER_ID \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -311,12 +332,12 @@ curl -H "Host: book-store-eu.local" http://localhost/api/v1/orders/$ORDER_ID \
 
 **Get database stats (Direct):**
 ```sh
-curl http://localhost:8090/internal/admin/stats
+curl http://localhost:8081/internal/admin/stats
 ```
 
 **Reset database (Direct):**
 ```sh
-curl -X POST http://localhost:8090/internal/admin/reset
+curl -X POST http://localhost:8081/internal/admin/reset
 ```
 
 ## Traefik

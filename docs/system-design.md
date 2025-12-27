@@ -237,12 +237,15 @@ POST   /api/v1/checkout           # Process payment
 ```
 Naglfar collects data from:
 - Request metadata (IP, headers, timing)
+- E-TOKEN generation events (published to Redis pub/sub)
 - Attack patterns detected
 - Rate limit violations
 - Failed authentication attempts
 - Anomalous behavior
 
 Naglfar stores/processes:
+- Real-time events: Redis pub/sub (naglfar-events channel)
+- Event data: {client_ip, store_id, action, timestamp}
 - Short-term: In-memory cache (Redis) for fast lookups
 - Long-term: Database (PostgreSQL/TimescaleDB) for analysis
 - Metrics: Prometheus for monitoring
@@ -258,17 +261,23 @@ Naglfar stores/processes:
 #### ✅ Implemented
 - .NET 10.0 API foundation
 - Traefik API Gateway with routing
+- YARP reverse proxy to backend services
+- Header-based authentication (AUTH-TOKEN, E-TOKEN)
+- E-TOKEN generation with base64-encoded JSON (expiry_date, store_id)
+- Multi-store support (10 stores with store_id in paths)
+- Redis pub/sub for E-TOKEN events
+- CLIENT_IP header extraction
 - Prometheus metrics endpoint
 - Health checks (liveness/readiness)
 - API versioning (v1)
-- Integration tests
+- Integration tests (33 tests passing)
 - Docker + Docker Compose deployment
 
 #### 🔄 In Progress
-- Naglfar protection logic
-- Book store backend API
+- Redis event consumer/analytics
 - Threat detection algorithms
 - Rate limiting implementation
+- Account compromise detection
 
 #### 📋 Planned
 - Database schema for threat data
@@ -284,7 +293,8 @@ Naglfar stores/processes:
 ### Naglfar Layer
 - **Language**: C# / .NET 10.0
 - **Framework**: ASP.NET Core Minimal APIs
-- **Cache**: Redis (for IP reputation, rate limiting)
+- **Reverse Proxy**: YARP (Yet Another Reverse Proxy)
+- **Cache/Pub-Sub**: Redis 8.x (for IP reputation, rate limiting, event streaming)
 - **Database**: PostgreSQL or TimescaleDB (for threat analytics)
 - **Metrics**: Prometheus
 - **Logging**: Structured JSON logging

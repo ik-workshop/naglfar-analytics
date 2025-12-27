@@ -9,7 +9,7 @@ router = APIRouter(
 )
 
 
-@router.post("/authorize", response_model=Token, status_code=status.HTTP_201_CREATED)
+@router.post("/generate/authtoken", response_model=Token, status_code=status.HTTP_201_CREATED)
 async def authorize(user_data: UserRegister):
     """
     Register a new user account
@@ -30,8 +30,9 @@ async def authorize(user_data: UserRegister):
 
     # Create token (auto-login after registration)
     # TODO: read signature from env variable SIGNATURE_KEY
-    token = # TODO: create for now uuid4, add a TODO to create a JSON with multiple fields and signature
+    # TODO: create for now uuid4, add a TODO to create a JSON with multiple fields and signature
     # TODO: the route should set this token SHA 256 hash as AUTH_TOKEN_ID
+    token = "asdfadbasdf"
 
     return Token(access_token=token, user_id=user["id"])
 

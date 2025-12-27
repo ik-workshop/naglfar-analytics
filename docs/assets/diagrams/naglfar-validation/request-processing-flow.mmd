@@ -4,11 +4,7 @@ flowchart TD
 
     AuthMW --> InfraCheck{Is Infrastructure<br/>Endpoint?}
 
-    InfraCheck -->|"/healthz"| HealthzHandler[Local Handler:<br/>Health Check]
-    InfraCheck -->|"/readyz"| ReadyzHandler[Local Handler:<br/>Readiness Check]
-    InfraCheck -->|"/metrics"| MetricsHandler[Local Handler:<br/>Prometheus Metrics]
-    InfraCheck -->|"/api/v1/info"| InfoHandler[Local Handler:<br/>Service Info]
-    InfraCheck -->|"/swagger/*"| SwaggerHandler[Local Handler:<br/>API Documentation]
+    InfraCheck -->|"/healthz<br/>/readyz<br/>/metrics<br/>/swagger/*"| LocalHandler[Local Handler:<br/>Health Check]
 
     InfraCheck -->|No - Other Path| AuthCheck{Has<br/>AUTH-TOKEN<br/>Header?}
 
@@ -16,12 +12,16 @@ flowchart TD
     YARPProxy --> Backend[Backend Service<br/>protected-service-eu:8000]
     Backend --> Response1[HTTP Response]
 
-    AuthCheck -->|No| GenerateEToken[Always Generate New<br/>E-TOKEN UUID<br/>Ignore existing E-TOKEN]
+    AuthCheck -->|No| ExtractData[Extract Data:<br/>- store_id from path<br/>- CLIENT_IP from header]
 
-    GenerateEToken --> SetHeader[Set E-TOKEN Header]
+    ExtractData --> GenerateEToken[Generate New E-TOKEN<br/>Base64 JSON:<br/>{expiry_date, store_id}]
+
+    GenerateEToken --> PublishRedis[Publish to Redis<br/>Channel: naglfar-events<br/>{client_ip, store_id, action: e-token}]
+
+    PublishRedis --> SetHeader[Set E-TOKEN Header]
     SetHeader --> Redirect[302 Redirect to Auth Service]
 
-    Redirect --> RedirectURL[Location: auth-service?<br/>return_url=original_path<br/>&e_token=uuid]
+    Redirect --> RedirectURL[Location: auth-service?<br/>return_url=original_path<br/>&e_token=base64_json]
     RedirectURL --> AuthService[Auth Service<br/>localhost:8090/auth]
 
     AuthService --> UserAuth[User Authenticates]
@@ -29,14 +29,12 @@ flowchart TD
     SetAuthHeader --> RedirectBack[Redirect Back to<br/>Original return_url]
     RedirectBack --> Start
 
-    HealthzHandler --> Response2[HTTP Response]
-    ReadyzHandler --> Response2
-    MetricsHandler --> Response2
-    InfoHandler --> Response2
-    SwaggerHandler --> Response2
+    LocalHandler --> Response2[HTTP Response]
 
     style InfraCheck fill:#e1f5ff
     style AuthCheck fill:#fff4e1
     style YARPProxy fill:#e8f5e9
     style Redirect fill:#ffebee
     style AuthMW fill:#f3e5f5
+    style PublishRedis fill:#fce4ec
+    style ExtractData fill:#fff9c4

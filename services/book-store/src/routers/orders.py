@@ -1,13 +1,13 @@
 """Orders router - order creation and checkout"""
 from datetime import datetime, timedelta
 from typing import List
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Path
 from storage.database import db
 from storage.models import CheckoutRequest, OrderResponse, CartItemResponse
 from dependencies import get_current_user
 
 router = APIRouter(
-    prefix="/api/v1",
+    prefix="/api/v1/{store_id}",
     tags=["orders"],
     dependencies=[Depends(get_current_user)]
 )
@@ -15,16 +15,21 @@ router = APIRouter(
 
 @router.post("/checkout", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 async def checkout(
-    checkout_data: CheckoutRequest,
+    store_id: str = Path(..., description="Store ID"),
+    checkout_data: CheckoutRequest = ...,
     current_user: dict = Depends(get_current_user)
 ):
     """
     Process checkout and create an order from cart items
 
+    - **store_id**: Store identifier (e.g., store-1, store-2)
     - **payment_method**: Payment method identifier (e.g., "card_ending_1234")
 
     Requires authentication
     """
+    if not db.is_valid_store(store_id):
+        raise HTTPException(status_code=404, detail=f"Store '{store_id}' not found")
+
     # Get cart items
     cart_items = db.get_cart(current_user["id"])
     if not cart_items:

@@ -1,24 +1,28 @@
 """Inventory router - check stock availability"""
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Path
 from storage.database import db
 from storage.models import InventoryResponse
 
 router = APIRouter(
-    prefix="/api/v1/inventory",
+    prefix="/api/v1/{store_id}/inventory",
     tags=["inventory"]
 )
 
 
 @router.get("", response_model=List[InventoryResponse])
 async def check_inventory(
+    store_id: str = Path(..., description="Store ID"),
     book_id: Optional[int] = Query(None, description="Check specific book ID")
 ):
     """
     Check inventory levels for books
 
+    - **store_id**: Store identifier (e.g., store-1, store-2)
     - **book_id**: Optional - check specific book, or all books if not provided
     """
+    if not db.is_valid_store(store_id):
+        raise HTTPException(status_code=404, detail=f"Store '{store_id}' not found")
     if book_id:
         book = db.get_book(book_id)
         if not book:

@@ -16,6 +16,9 @@ trim_trailing_whitespace = true
 [*.{csproj,locproj,nativeproj,proj,resx,slnx,vbproj}]
 charset = utf-8
 
+[*.{mk}]
+indent_style = tab
+
 # Generated code
 [*{_AssemblyInfo.cs,.notsupported.cs,AsmOffsets.cs}]
 generated_code = true

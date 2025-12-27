@@ -267,6 +267,8 @@ These endpoints are commonly used by:
 - [Mermaid diagrams cli](https://github.com/mermaid-js/mermaid-cli)
 - [Diagrams as code](https://diagrams.mingrammer.com/docs/nodes/custom)
 - [Dapr](https://dapr.io/)
+- [Redis](https://redis.io/)
+- [Redis mod](https://hub.docker.com/r/redislabs/redismod)
 
 ## License
 

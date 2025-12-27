@@ -66,6 +66,24 @@ async def root():
     }
 
 
+@app.get("/api/v1/stores")
+async def list_stores():
+    """List all available stores"""
+    from storage.database import db
+    stores = [
+        {
+            "store_id": store_id,
+            "location": location,
+            "api_base_url": f"/api/v1/{store_id}"
+        }
+        for store_id, location in db.stores.items()
+    ]
+    return {
+        "stores": stores,
+        "total_count": len(stores)
+    }
+
+
 @app.get("/healthz")
 async def health_check():
     """Health check endpoint for Kubernetes liveness probe"""

@@ -115,7 +115,7 @@
   - [ ] Time-series database (InfluxDB, TimescaleDB)
   - [ ] Document store (MongoDB, Elasticsearch)
   - [ ] Object storage (S3, Minio)
-  - [ ] In-memory cache (Redis)
+  - [x] In-memory cache (Redis) - **Active: pub/sub for E-TOKEN events**
 
 ### Outputs & Reports
 **Questions to answer:**
@@ -239,10 +239,10 @@
 ### External Dependencies
 **Questions to answer:**
 - What external services are required?
-  - [ ] Message queue (RabbitMQ, Kafka)
-  - [ ] Cache (Redis, Memcached)
+  - [x] Message queue (RabbitMQ, Kafka)
+  - [x] Cache (Redis, Memcached) - **Redis for pub/sub and caching**
   - [ ] Search engine (Elasticsearch)
-  - [ ] Monitoring (Prometheus, Grafana)
+  - [x] Monitoring (Prometheus, Grafana)
   - [ ] Logging (ELK stack, Loki)
 
 ---
@@ -324,6 +324,9 @@
 - **API Gateway**: Traefik v3.6
 - **Metrics**: Prometheus (prometheus-net.AspNetCore)
 - **Testing**: xUnit, WebApplicationFactory
+- **Cache/Pub-Sub**: Redis 8.x
+- **Message Broker**: Redis pub/sub (naglfar-events channel)
+- **Reverse Proxy**: YARP (Yet Another Reverse Proxy)
 
 ### Constraints & Limitations
 **Questions to answer:**

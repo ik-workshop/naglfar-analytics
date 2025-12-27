@@ -531,6 +531,7 @@ This service is part of the Naglfar Analytics monorepo. For contribution guideli
 - [System Design](../../docs/system-design.md)
 - [Architecture Documentation](../../docs/naglfar-layer-architecture.md)
 - [CHANGELOG](../../CHANGELOG.md)
+- [Prometheus](https://github.com/prometheus-net/prometheus-net)
 
 ## License
 
