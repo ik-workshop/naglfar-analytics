@@ -4,10 +4,31 @@
 
 These endpoints are used for health checks and monitoring:
 
+## API
+
 ```sh
-http://localhost:8080/healthz          # Health check (Kubernetes liveness probe)
-http://localhost:8080/readyz           # Readiness check (Kubernetes readiness probe)
-http://localhost:8080/metrics          # Prometheus metrics endpoint
+curl http://localhost:8000/healthz          # Health check (Kubernetes liveness probe)
+curl http://localhost:8000/readyz           # Readiness check (Kubernetes readiness probe)
+curl http://localhost:8000/metrics          # Prometheus metrics endpoint
+curl http://localhost:8000/api/v1/info
+```
+
+### Over traefik
+
+```sh
+curl -H "Host: api.local" http://localhost/healthz
+curl -H "Host: api.local" http://localhost/metrics
+curl -H "Host: api.local" http://localhost/api/v1/info
+```
+
+
+## Traefik
+
+```sh
+http://localhost:8080/dashboard/            # Traefik dashboard
+curl http://localhost:8080/healthz          # Traefik Health check (Kubernetes liveness probe)
+curl http://localhost:8080/readyz           # Traefik Readiness check (Kubernetes readiness probe)
+curl http://localhost:8080/metrics          # Traefik Prometheus metrics endpoint
 ```
 
 ## API Endpoints (Versioned)

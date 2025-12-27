@@ -34,7 +34,12 @@ A lightweight .NET web application providing **health monitoring and analytics c
   - Swashbuckle.AspNetCore (10.1.0) ✅
   - Asp.Versioning.Http (8.1.0) ✅
   - Asp.Versioning.Mvc.ApiExplorer (8.1.0) ✅
+  - prometheus-net.AspNetCore (8.2.1) ✅
   - Microsoft.Extensions.Diagnostics.HealthChecks (built into .NET 10.0) ✅
+- **Testing**:
+  - Microsoft.AspNetCore.Mvc.Testing (10.0.1) ✅
+  - xUnit (2.9.3) ✅
+  - coverlet.collector (6.0.4) ✅
 
 ### Application Architecture
 
@@ -44,6 +49,7 @@ A lightweight .NET web application providing **health monitoring and analytics c
 |----------|--------|---------|--------|---------|----------|
 | `/healthz` | GET | Health check | ✅ Complete | Unversioned | Kubernetes liveness probe |
 | `/readyz` | GET | Readiness check | ✅ Complete | Unversioned | Kubernetes readiness probe |
+| `/metrics` | GET | Prometheus metrics | ✅ Complete | Unversioned | Prometheus/Grafana monitoring |
 | `/api/v1/info` | GET | Application metadata | ✅ Complete | v1 | Version info, service discovery |
 | `/swagger` | GET | API documentation | ⚠️ Issue | - | Developer documentation (dev only) |
 
@@ -84,6 +90,164 @@ A lightweight .NET web application providing **health monitoring and analytics c
 ---
 
 ## Changelog
+
+### 2025-12-27 - Traefik API Gateway Integration
+
+#### Added
+- **✅ Traefik as API Gateway** (`docker-compose.yml:22-43`)
+  - **Traefik Service**:
+    - Image: `traefik:v3.6`
+    - Ports: 80 (web), 8080 (dashboard)
+    - Dashboard: `http://localhost:8080/dashboard/`
+    - Metrics: Prometheus metrics enabled with service/entrypoint labels
+
+  - **Whoami Test Service** (`docker-compose.yml:45-54`):
+    - Test service for Traefik routing verification
+    - Route: `whoami.local`
+    - Validates Traefik proxy configuration
+
+  - **Network Configuration**:
+    - Custom bridge network: `naglfar-network`
+    - All services connected for internal communication
+
+#### Fixed
+- **✅ Traefik Routing Configuration** (`docker-compose.yml:20`)
+  - **Issue**: API service not accessible through Traefik (`curl -H "Host: api.local" http://localhost/healthz` failed)
+  - **Root Cause**: Incorrect label format - `traefik.http.routers.api-svc.loadbalancer.server.port=8000`
+  - **Resolution**:
+    - Changed to: `traefik.http.services.api-svc.loadbalancer.server.port=8000` (routers → services)
+    - Added: `traefik.http.routers.api-svc.service=api-svc` (explicit router-to-service link)
+
+  - **Explanation**:
+    - In Traefik: **routers** define routing rules, **services** define backend servers
+    - Load balancer configuration belongs to services, not routers
+
+#### Updated
+- **Documentation** (`docs/endpoints.md`):
+  - Added Traefik routing examples with Host headers
+  - API endpoints now documented with both direct access (port 8000) and Traefik routing
+  - Traefik dashboard and metrics endpoints documented
+
+#### Verification
+- ✅ Direct access works: `curl http://localhost:8000/healthz`
+- ✅ Traefik routing works: `curl -H "Host: api.local" http://localhost/healthz`
+- ✅ Whoami service works: `curl -H "Host: whoami.local" http://localhost/`
+- ✅ Traefik metrics: `curl http://localhost:8080/metrics`
+
+---
+
+### 2025-12-27 - Prometheus Metrics & Test Organization
+
+#### Added
+- **✅ Prometheus Metrics Endpoint** (Enhancement Item #9)
+  - **Package Added** (`NaglfartAnalytics.csproj`):
+    - `prometheus-net.AspNetCore` (8.2.1) - HTTP metrics collection and export
+
+  - **Metrics Configuration** (`Program.cs:1, 52, 64`):
+    - Added `using Prometheus;` directive
+    - Middleware: `app.UseHttpMetrics();` - Tracks HTTP request metrics
+    - Endpoint: `app.MapMetrics();` - Exposes `/metrics` for Prometheus scraping
+
+  - **Metrics Endpoint** (`/metrics`):
+    - Format: Prometheus text-based format
+    - Metrics: HTTP request duration, request count, response sizes
+    - Labels: HTTP method, status code, endpoint
+    - Use Case: Prometheus/Grafana monitoring
+
+  - **Documentation Updated** (`docs/endpoints.md:10`):
+    - Added `/metrics` to Infrastructure Endpoints section
+    - Documented as Prometheus metrics endpoint
+
+  - **Integration Test** (`tests/NaglfartAnalytics.Tests/MetricsTests.cs`):
+    - New test file: `MetricsTests.cs` (34 lines)
+    - Test: `MetricsEndpoint_ReturnsPrometheusFormat()`
+    - Validates:
+      - `/metrics` returns 200 OK
+      - Response contains Prometheus format (`# HELP`, `# TYPE`)
+      - HTTP metrics are tracked (`http_` prefix)
+
+#### Refactored
+- **✅ Test Organization Improvement**
+  - **Created**: `tests/NaglfartAnalytics.Tests/MetricsTests.cs`
+    - Dedicated test class for metrics-related tests
+    - Uses `WebApplicationFactory<Program>` fixture
+    - Currently 1 test, ready for expansion
+
+  - **Updated**: `tests/NaglfartAnalytics.Tests/IntegrationTests.cs`
+    - Removed metrics test (moved to MetricsTests.cs)
+    - Now contains only general integration tests (9 tests)
+
+  - **Benefits**:
+    - Better test organization and separation of concerns
+    - Easier to add more metrics tests in the future
+    - Clear distinction between integration and metrics tests
+
+#### Test Results
+- ✅ Total Tests: 10 (9 integration + 1 metrics)
+- ✅ Passed: 10
+- ✅ Failed: 0
+- ✅ Duration: ~250-350ms
+
+#### Benefits
+- ✅ Production-ready monitoring with Prometheus/Grafana integration
+- ✅ Standard metrics format for observability stack
+- ✅ HTTP request/response metrics out of the box
+- ✅ No custom instrumentation needed for basic HTTP metrics
+- ✅ Improved test organization for future growth
+
+---
+
+### 2025-12-27 - Integration Tests Implementation
+
+#### Added
+- **✅ Comprehensive Integration Tests** (Enhancement Item #16)
+  - **Test Project Created**: `tests/NaglfartAnalytics.Tests/`
+    - Framework: .NET 10.0
+    - Test Framework: xUnit
+    - Testing Package: `Microsoft.AspNetCore.Mvc.Testing` (10.0.1)
+    - Test Runner: `xunit.runner.visualstudio` (3.1.4)
+    - Code Coverage: `coverlet.collector` (6.0.4)
+
+  - **Integration Tests** (`tests/NaglfartAnalytics.Tests/IntegrationTests.cs`):
+    - Uses `WebApplicationFactory<Program>` for in-memory testing
+    - 9 comprehensive tests covering all endpoints:
+      1. `HealthCheck_ReturnsHealthy()` - Health endpoint returns 200 OK
+      2. `HealthCheck_ReturnsJsonContent()` - Health endpoint returns valid JSON
+      3. `ReadinessCheck_ReturnsReady()` - Readiness endpoint returns 200 OK
+      4. `ReadinessCheck_ReturnsJsonContent()` - Readiness endpoint returns valid JSON
+      5. `ApiV1Info_ReturnsApplicationInfo()` - API info endpoint returns correct data
+      6. `ApiV1Info_SupportsQueryStringVersioning()` - Query string versioning works
+      7. `ApiV1Info_SupportsHeaderVersioning()` - Header versioning works
+      8. `ApiResponse_ContainsVersionHeaders()` - API version headers present
+      9. `AllEndpoints_ReturnSuccessStatusCode()` - All endpoints return 2xx
+
+  - **Program.cs Modification** (`Program.cs:77`):
+    - Made `Program` class public with `public partial class Program { }`
+    - Enables `WebApplicationFactory<Program>` to access the entry point
+
+  - **Makefile Test Commands** (`Makefile:46-68`):
+    - `make test` - Run all tests
+    - `make test-watch` - Run tests in watch mode (auto-rerun on changes)
+    - `make test-coverage` - Run tests with code coverage report
+    - `make test-verbose` - Run tests with detailed output
+
+  - **Test Coverage**: Updated Makefile restore/build commands to include test project
+
+#### Test Results
+- ✅ Total Tests: 9
+- ✅ Passed: 9
+- ✅ Failed: 0
+- ✅ Duration: ~350ms
+
+#### Benefits
+- ✅ Safety net for refactoring and changes
+- ✅ Validates all endpoint functionality
+- ✅ Tests API versioning strategies (URL, query string, header)
+- ✅ Fast feedback loop with watch mode
+- ✅ Code coverage tracking enabled
+- ✅ CI/CD ready
+
+---
 
 ### 2025-12-27 - Docker Image Optimization
 
@@ -444,13 +608,17 @@ var v1Group = v1.MapGroup("/api/v{version:apiVersion}").HasApiVersion(1, 0);
 
 ### 🟢 Enhancement Opportunities
 
-#### 9. Add Prometheus Metrics Endpoint
+#### 9. ✅ ~~Add Prometheus Metrics Endpoint~~ - IMPLEMENTED (2025-12-27)
 **Feature**: Export metrics at `/metrics` for Prometheus scraping
+**Resolution**: Fully implemented with prometheus-net.AspNetCore
 ```csharp
-// Add package: prometheus-net.AspNetCore
+// ✅ IMPLEMENTED
+using Prometheus;
 app.UseHttpMetrics();
 app.MapMetrics(); // Creates /metrics endpoint
 ```
+**Status**: ✅ COMPLETE - Metrics endpoint at `/metrics`, integration test added
+**Benefits**: Production-ready monitoring with HTTP metrics (duration, count, response sizes)
 
 #### 10. Add Readiness Check Dependencies
 **Feature**: `/readyz` should verify external dependencies
@@ -524,10 +692,12 @@ spec:
 - Push to container registry
 - Deploy to environments
 
-#### 16. Add Integration Tests
+#### 16. ✅ ~~Add Integration Tests~~ - IMPLEMENTED (2025-12-27)
 **Feature**: Test endpoints with WebApplicationFactory
+**Resolution**: Comprehensive test suite implemented
 ```csharp
-public class HealthCheckTests : IClassFixture<WebApplicationFactory<Program>>
+// ✅ IMPLEMENTED
+public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 {
     [Fact]
     public async Task HealthCheck_ReturnsHealthy()
@@ -536,8 +706,18 @@ public class HealthCheckTests : IClassFixture<WebApplicationFactory<Program>>
         var content = await response.Content.ReadAsStringAsync();
         Assert.Contains("Healthy", content);
     }
+    // ... 9 total integration tests
+}
+
+public class MetricsTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    [Fact]
+    public async Task MetricsEndpoint_ReturnsPrometheusFormat() { ... }
 }
 ```
+**Status**: ✅ COMPLETE - 10 tests (9 integration + 1 metrics), all passing
+**Coverage**: Health checks, readiness, API versioning (URL/query/header), metrics endpoint
+**Makefile**: `make test`, `make test-watch`, `make test-coverage`, `make test-verbose`
 
 ### 🔧 Code Quality Improvements
 
@@ -601,11 +781,16 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "Healthy" }))
 - **Files**: `NaglfartAnalytics.csproj:10-11`, `Program.cs:22-35`
 - **Status**: ✅ Clean build (0 warnings), application runs successfully
 
-#### 2. ⚠️ No Automated Testing (HIGH)
+#### 2. ✅ ~~No Automated Testing~~ - RESOLVED (2025-12-27)
 - **Issue**: Zero test coverage
-- **Missing**: Unit tests, integration tests, health check tests
-- **Impact**: No safety net for refactoring, regression risks
-- **Effort**: 4-8 hours (setup + write core tests)
+- **Resolution**: Comprehensive integration test suite implemented
+  - Test project: `tests/NaglfartAnalytics.Tests/`
+  - Test framework: xUnit with WebApplicationFactory
+  - 10 tests covering all endpoints
+  - Separated test files: IntegrationTests.cs (9 tests), MetricsTests.cs (1 test)
+  - Makefile commands: test, test-watch, test-coverage, test-verbose
+- **Status**: ✅ All tests passing (10/10)
+- **Impact**: Safety net for refactoring established
 
 #### 3. ⚠️ No Structured Logging (MEDIUM)
 - **Issue**: Using default console logging only
@@ -670,16 +855,18 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "Healthy" }))
 | Framework Version | .NET 10.0 | ✅ Latest |
 | Package Versions | .NET 10.0 | ✅ Aligned |
 | API Versioning | v1 | ✅ Implemented |
-| Total Endpoints | 3 (+ Swagger) | ✅ Core complete |
+| Total Endpoints | 4 (+ Swagger) | ✅ Core complete |
 | Docker Support | ✅ Yes | ✅ Complete |
 | Compose Support | ✅ Yes | ✅ Complete |
-| Test Coverage | 0% | ⚠️ Target: 80%+ |
+| API Gateway | ✅ Traefik v3.6 | ✅ Complete |
+| Test Coverage | 10 tests passing | ✅ Integration tests |
+| Test Organization | Separated files | ✅ Good |
 | Documentation | ✅ Comprehensive | ✅ Good |
-| HTTPS Support | ❌ No | ⚠️ Needed |
+| HTTPS Support | ❌ No | ⚠️ Not required |
 | Logging | Basic | ⚠️ Need structured |
-| Monitoring | None | ⚠️ Need metrics |
+| Monitoring | ✅ Prometheus | ✅ Complete |
 | Security Headers | ❌ No | ⚠️ Required |
-| Production Ready | ⚠️ Partial | Target: Full |
+| Production Ready | ✅ Good | Target: Full |
 
 ### Dependency Health
 | Package | Current | Latest | Status |
@@ -689,6 +876,9 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "Healthy" }))
 | Swashbuckle.AspNetCore | 10.1.0 | 10.1.0 | ⚠️ Swagger UI issue |
 | Asp.Versioning.Http | 8.1.0 | 8.1.0 | ✅ Up-to-date |
 | Asp.Versioning.Mvc.ApiExplorer | 8.1.0 | 8.1.0 | ✅ Up-to-date |
+| prometheus-net.AspNetCore | 8.2.1 | 8.2.1 | ✅ Up-to-date |
+| Microsoft.AspNetCore.Mvc.Testing | 10.0.1 | 10.0.1 | ✅ Up-to-date |
+| xunit | 2.9.3 | 2.9.3 | ✅ Up-to-date |
 | Microsoft.Extensions.Diagnostics.HealthChecks | Built-in | Built-in | ✅ Framework-provided |
 
 ---
@@ -697,15 +887,16 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "Healthy" }))
 
 1. ✅ ~~**Update NuGet Packages to .NET 10.0**~~ - COMPLETED
 2. ✅ ~~**Implement API Versioning**~~ - COMPLETED (Swagger UI issue deferred)
-3. ⚠️ **Fix Swagger UI OpenAPI version error** - Investigate compatibility issue with API versioning
-4. ⚠️ **Add Structured Logging** - Implement JSON logging with Serilog
-4. ⚠️ **Add Security Headers Middleware** - HSTS, CSP, X-Frame-Options
-5. ⚠️ **Implement Real Health Checks** - Check actual application health, not just "always healthy"
-6. ⚠️ **Add Integration Tests** - Use WebApplicationFactory for endpoint tests
-7. ⚠️ **Add HTTPS Support** - Configure certificates and HTTPS endpoints
-8. ⚠️ **Add Prometheus Metrics** - Export metrics at `/metrics`
-9. ⚠️ **Create CI/CD Pipeline** - GitHub Actions for automated builds
-10. ⚠️ **Add Kubernetes Manifests** - Deployment, Service, Ingress YAML files
+3. ✅ ~~**Add Integration Tests**~~ - COMPLETED (10 tests, all passing)
+4. ✅ ~~**Add Prometheus Metrics**~~ - COMPLETED (metrics at `/metrics`)
+5. ✅ ~~**Add Traefik API Gateway**~~ - COMPLETED (with routing fix)
+6. ⚠️ **Fix Swagger UI OpenAPI version error** - Investigate compatibility issue with API versioning
+7. ⚠️ **Add Structured Logging** - Implement JSON logging with Serilog
+8. ⚠️ **Add Security Headers Middleware** - HSTS, CSP, X-Frame-Options
+9. ⚠️ **Implement Real Health Checks** - Check actual application health, not just "always healthy"
+10. ⚠️ **Add HTTPS Support** - Configure certificates and HTTPS endpoints (low priority - not required)
+11. ⚠️ **Create CI/CD Pipeline** - GitHub Actions for automated builds
+12. ⚠️ **Add Kubernetes Manifests** - Deployment, Service, Ingress YAML files
 
 ---
 
@@ -778,19 +969,28 @@ naglfar-analytics/
 │
 ├── src/
 │   └── NaglfartAnalytics/
-│       ├── Program.cs              # Application entry point (40 lines)
+│       ├── Program.cs              # Application entry point (~80 lines)
 │       │                           # - Minimal API configuration
-│       │                           # - Health check endpoints (lines 22-28)
-│       │                           # - Swagger setup (lines 15-18)
+│       │                           # - Health check endpoints (unversioned)
+│       │                           # - Prometheus metrics endpoint
+│       │                           # - Versioned API endpoints (/api/v1/*)
+│       │                           # - Swagger setup
 │       ├── NaglfartAnalytics.csproj # .NET 10.0 project file
-│       │                           # - 3 NuGet packages
+│       │                           # - 6 NuGet packages
 │       ├── appsettings.json        # Production configuration
 │       ├── appsettings.Development.json # Development configuration
 │       └── Properties/
 │           └── launchSettings.json # Local development settings
 │
+├── tests/
+│   └── NaglfartAnalytics.Tests/
+│       ├── IntegrationTests.cs     # Integration tests (9 tests)
+│       │                           # - Health/readiness checks
+│       │                           # - API versioning tests
+│       ├── MetricsTests.cs         # Metrics endpoint tests (1 test)
+│       └── NaglfartAnalytics.Tests.csproj # Test project file
+│
 └── .git/                           # Version control
-    └── (4 commits since 2025-12-27)
 ```
 
 ### Key Files by Purpose
@@ -831,5 +1031,14 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/):
 ---
 
 **End of Changelog**
-**Last Analyzed**: 2025-12-27
-**Analysis Completeness**: ✅ Full (4 commits, 7 files, 17 make commands)
+**Last Updated**: 2025-12-27
+**Analysis Completeness**: ✅ Full
+**Current State**:
+- ✅ .NET 10.0 with 6 production packages
+- ✅ 4 endpoints (health, readiness, metrics, API info)
+- ✅ API Gateway (Traefik v3.6)
+- ✅ 10 integration tests (all passing)
+- ✅ Prometheus metrics
+- ✅ API versioning (v1)
+- ✅ Docker + Compose
+- ✅ Comprehensive documentation

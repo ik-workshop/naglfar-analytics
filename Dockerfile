@@ -25,15 +25,13 @@ RUN dotnet publish "NaglfartAnalytics.csproj" \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 
 WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
+EXPOSE 8000
+EXPOSE 8001
 
 COPY --from=publish /app/publish .
 
-ENV ASPNETCORE_URLS=http://+:8080;http://+:8081
-
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/healthz || exit 1
+# HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+#     CMD curl -f http://localhost:8000/healthz || exit 1
 
 ENTRYPOINT ["dotnet", "NaglfartAnalytics.dll"]

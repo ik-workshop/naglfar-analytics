@@ -121,3 +121,7 @@ compose-logs:
 #? api-rebuild: rebuild api
 api-rebuild:
 	@docker compose -f docker-compose.yml up -d --build api
+
+#? apigw-restart: rebuild and restart traefik
+apigw-restart:
+	@docker compose -f docker-compose.yml up -d --build api-gateway

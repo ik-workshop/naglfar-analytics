@@ -1,25 +1,63 @@
 services:
+  api-gateway:
+    image: "traefik:v3.6"
+    container_name: "traefik"
+    restart: unless-stopped
+    networks:
+      - naglfar-network
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      # - "--providers.docker.network=naglfar-network"
+      - "--entryPoints.web.address=:80"
+      - "--log.level=DEBUG"
+      - "--metrics.prometheus=true"
+      # - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
+      - "--metrics.prometheus.addserviceslabels=true"
+      - "--metrics.prometheus.addentrypointslabels=true"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: naglfar-analytics
+    container_name: api
     ports:
-      - "8080:8080"
-      - "8081:8081"
+      - "8000:8000"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=http://+:8080
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
+      - ASPNETCORE_URLS=http://+:8000
     restart: unless-stopped
     networks:
     - naglfar-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.apivone.rule=Host(`api.local`)"
+      - "traefik.http.routers.apivone.entrypoints=web"
+      - "traefik.http.routers.apivone.service=apivone"
+      - "traefik.http.services.apivone.loadbalancer.server.port=8000"
+
+  # whoami:
+  #   image: "traefik/whoami"
+  #   container_name: whoami
+  #   restart: unless-stopped
+  #   networks:
+  #     - naglfar-network
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.whoami.rule=Host(`whoami.local`)"
+  #     - "traefik.http.routers.whoami.entrypoints=web"
 
 networks:
   naglfar-network:
     driver: bridge
+    name: naglfar-network
+  # proxy:
+  #   external: true
+  #   driver: bridge

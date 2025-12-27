@@ -64,13 +64,6 @@ make docker-logs
 make docker-down
 ```
 
-## Available Endpoints
-
-- `GET /` - Application information
-- `GET /healthz` - Health check endpoint (returns `{"status": "Healthy"}`)
-- `GET /readyz` - Readiness check endpoint (returns `{"status": "Ready"}`)
-- `GET /swagger` - Swagger UI (development mode only)
-
 ## Testing Endpoints
 
 ```bash
@@ -157,6 +150,9 @@ These endpoints are commonly used by:
 ## Resources
 
 - [Reference Compose](https://docs.docker.com/compose/how-tos/multiple-compose-files/extends/)
+- [Traefik Expose Services](https://doc.traefik.io/traefik/expose/docker/)
+- [Traefik Examples](https://github.com/ik-infrastructure-testing/traefik-examples-fork)
+- [Traefik Routes](https://doc.traefik.io/traefik/reference/routing-configuration/http/routing/rules-and-priority/#rule)
 
 ## License
 
