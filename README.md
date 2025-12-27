@@ -139,11 +139,41 @@ Run `make help` to see all available commands with descriptions.
 - `make diagrams-clean` - Remove generated SVG files
 - `make diagrams-check` - Check if Docker is available
 
+### Service-Specific Commands
+
+The project uses **modular helper makefiles** for service-specific commands. Each service maintains its own `helpers.mk` file with build and deployment commands.
+
+**Book Store Service:**
+- `make docker-build-book-store` - Build book-store Docker image
+- `make docker-run-book-store` - Run book-store container (port 8090)
+- `make lock-dependencies-book-store` - Generate Pipfile.lock using Docker (no local Python/pipenv needed)
+- `make compose-rebuild-book-store` - Rebuild book-store via docker-compose
+
+**Naglfar Validation Service:**
+- `make docker-build-naglfar` - Build naglfar-validation Docker image
+- `make docker-run-naglfar` - Run naglfar-validation container
+- `make docker-stop-naglfar` - Stop and remove container
+- `make docker-clean-naglfar` - Remove Docker image
+
+**Benefits of Modular Makefiles:**
+- Each service maintains its own build commands in `services/<service>/helpers.mk`
+- Helper makefiles are automatically included by the root Makefile
+- Services know their own directory location (location-aware)
+- Easy to add new services without modifying the root Makefile
+- Run `make help` to see all available commands from all services
+
 ## Project Structure
 
 ```
 naglfar-analytics/                          # Monorepo root
 ├── services/                               # Microservices directory
+│   ├── book-store/                         # Book store service (Python FastAPI)
+│   │   ├── src/                            # Source code
+│   │   ├── Pipfile                         # Python dependencies
+│   │   ├── Pipfile.lock                    # Locked dependencies
+│   │   ├── Dockerfile                      # Multi-stage Docker build
+│   │   └── helpers.mk                      # Service-specific Makefile commands
+│   │
 │   └── naglfar-validation/                 # Validation service (.NET 10.0)
 │       ├── src/
 │       │   └── NaglfartAnalytics/
@@ -156,10 +186,12 @@ naglfar-analytics/                          # Monorepo root
 │       │       ├── IntegrationTests.cs     # Integration tests (9 tests)
 │       │       ├── MetricsTests.cs         # Metrics endpoint tests (1 test)
 │       │       └── NaglfartAnalytics.Tests.csproj # Test project file
-│       └── Dockerfile                      # Multi-stage Docker build (Alpine)
+│       ├── Dockerfile                      # Multi-stage Docker build (Alpine)
+│       └── helpers.mk                      # Service-specific Makefile commands
 │
 ├── infrastructure/                         # Infrastructure configuration
 │   ├── docker-compose.yml                  # Service orchestration (API + Traefik)
+│   ├── helpers.mk                          # Infrastructure Makefile commands
 │   ├── traefik/                            # API Gateway configuration (future)
 │   ├── kafka/                              # Message broker configuration (future)
 │   ├── neo4j/                              # Graph database configuration (future)

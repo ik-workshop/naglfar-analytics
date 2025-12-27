@@ -11,6 +11,7 @@ This directory contains all infrastructure-related configuration files for the N
 ```
 infrastructure/
 ├── docker-compose.yml          # Main service orchestration file
+├── helpers.mk                  # Infrastructure-specific Makefile commands
 ├── traefik/                    # Traefik API Gateway configuration (planned)
 ├── kafka/                      # Kafka message broker configuration (planned)
 ├── neo4j/                      # Neo4j graph database configuration (planned)
@@ -19,6 +20,23 @@ infrastructure/
 ```
 
 ## Current Components
+
+### Infrastructure Helper Makefile
+
+The `helpers.mk` file provides infrastructure-specific commands that are automatically included by the root Makefile:
+
+**Available Commands:**
+- `compose-up` - Start all services with docker-compose
+- `compose-down` - Stop and remove all containers
+- `compose-logs` - View logs from all services (follow mode)
+- `validation-rebuild` - Rebuild and restart naglfar-validation service
+- `apigw-restart` - Rebuild and restart Traefik API Gateway
+
+**Benefits:**
+- Location-aware using `INFRASTRUCTURE_DIR` variable
+- Automatically included by root Makefile via `-include infrastructure/helpers.mk`
+- Keeps infrastructure commands separate from service-specific commands
+- Can be run from repository root: `make compose-up`
 
 ### Docker Compose
 

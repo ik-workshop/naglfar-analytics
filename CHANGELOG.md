@@ -130,6 +130,63 @@ A lightweight .NET web application providing **health monitoring and analytics c
 - **auth-service** (Python FastAPI) - 3rd party authentication (planned)
 - **bookstore** (Python FastAPI) - Protected demo application (planned)
 
+### 2025-12-27 - Modular Makefile Organization & Build Improvements
+
+#### Added
+- **✅ Modular Helper Makefiles** - Service-specific build commands:
+  - **`infrastructure/helpers.mk`** - Infrastructure and orchestration commands:
+    - `compose-up`, `compose-down`, `compose-logs` - Docker Compose orchestration
+    - `validation-rebuild` - Rebuild naglfar-validation service
+    - `apigw-restart` - Rebuild and restart Traefik API Gateway
+    - Uses `INFRASTRUCTURE_DIR` variable for location awareness
+
+  - **`services/book-store/helpers.mk`** - Book store service commands:
+    - `docker-build-book-store` - Build book-store Docker image
+    - `docker-run-book-store` - Run book-store container (port 8090)
+    - `compose-rebuild-book-store` - Rebuild via docker-compose
+    - **`lock-dependencies-book-store`** - Generate Pipfile.lock using Docker (no local Python/pipenv needed)
+    - Uses `BOOK_STORE_DIR` variable for location awareness
+
+  - **`services/naglfar-validation/helpers.mk`** - Naglfar validation service commands:
+    - `docker-build-naglfar` - Build naglfar-analytics Docker image
+    - `docker-run-naglfar` - Run naglfar container
+    - `docker-stop-naglfar` - Stop and remove container
+    - `docker-clean-naglfar` - Remove Docker image
+    - Uses `NAGLFAR_VALIDATION_DIR` variable for location awareness
+
+#### Changed
+- **✅ Root Makefile Improvements** (`Makefile:1-153`):
+  - **Build System Enhancements**:
+    - Added `MAKEFLAGS += --warn-undefined-variables` - Catch undefined variable errors
+    - Added `MAKEFLAGS += --no-builtin-rules` - Disable implicit rules for clarity
+    - Moved diagram variables to top of file (lines 5-9) for better organization
+
+  - **Modular Architecture**:
+    - Added `-include` directives for helper makefiles (lines 15-17)
+    - Infrastructure, book-store, and naglfar-validation helpers loaded dynamically
+    - Each helper knows its own directory location via service-specific variables
+
+  - **Help System Update**:
+    - Changed help command to use awk pattern matching (line 13)
+    - New format: `target: ## Description` (double hash)
+    - Legacy format: `#? target: Description` still supported
+    - Colored output with proper alignment
+
+- **✅ Python Dependency Management** (`services/book-store/helpers.mk:13-21`):
+  - **Docker-based Pipfile.lock Generation**:
+    - Automatically extracts Python image from Dockerfile (`python:3.14`)
+    - Runs `pipenv lock` inside Docker container
+    - No local Python or pipenv installation required
+    - Mounts service directory for in-place file generation
+    - Usage: `make lock-dependencies-book-store`
+
+#### Benefits
+- **Separation of Concerns**: Each service maintains its own build commands
+- **Location Awareness**: Helper makefiles know their directory location when included from root
+- **Scalability**: Easy to add new services by creating service-specific helper makefiles
+- **Developer Experience**: No need to install Python/pipenv locally for dependency management
+- **Consistency**: All services follow the same pattern for helper makefiles
+
 ### 2025-12-27 - Architecture Diagrams & Documentation
 
 #### Added
