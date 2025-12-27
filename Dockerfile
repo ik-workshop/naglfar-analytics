@@ -1,5 +1,5 @@
 # Build stage
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /src
 
 # Copy csproj and restore dependencies
@@ -11,12 +11,19 @@ COPY src/NaglfartAnalytics/. ./NaglfartAnalytics/
 WORKDIR /src/NaglfartAnalytics
 RUN dotnet build "NaglfartAnalytics.csproj" -c Release -o /app/build
 
-# Publish stage
+# Publish stage with optimizations
 FROM build AS publish
-RUN dotnet publish "NaglfartAnalytics.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "NaglfartAnalytics.csproj" \
+    -c Release \
+    -o /app/publish \
+    /p:UseAppHost=false \
+    /p:PublishReadyToRun=true \
+    /p:PublishSingleFile=false \
+    /p:EnableCompressionInSingleFile=false
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
+
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
@@ -27,6 +34,6 @@ ENV ASPNETCORE_URLS=http://+:8080;http://+:8081
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/healthz || exit 1
+    CMD curl -f http://localhost:8080/healthz || exit 1
 
 ENTRYPOINT ["dotnet", "NaglfartAnalytics.dll"]

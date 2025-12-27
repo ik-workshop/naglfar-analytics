@@ -3,7 +3,34 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+// Add API versioning
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new Asp.Versioning.ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = Asp.Versioning.ApiVersionReader.Combine(
+        new Asp.Versioning.QueryStringApiVersionReader("api-version"),
+        new Asp.Versioning.HeaderApiVersionReader("X-Api-Version"),
+        new Asp.Versioning.UrlSegmentApiVersionReader());
+})
+.AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
+
+// Configure Swagger with API versioning
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new()
+    {
+        Title = "Naglfar Analytics API",
+        Version = "v1",
+        Description = "The ship made of dead men's nails. A bit darker, but represents collection and analysis of threat data."
+    });
+});
 
 // Add health checks
 builder.Services.AddHealthChecks();
@@ -15,26 +42,33 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Naglfar Analytics API v1");
+    });
 }
 
-// Health check endpoint
+// Health check endpoints (unversioned - infrastructure)
 app.MapGet("/healthz", () => Results.Ok(new { status = "Healthy" }))
     .WithName("HealthCheck")
-    .WithOpenApi();
+    .ExcludeFromDescription();
 
-// Readiness check endpoint
 app.MapGet("/readyz", () => Results.Ok(new { status = "Ready" }))
     .WithName("ReadinessCheck")
-    .WithOpenApi();
+    .ExcludeFromDescription();
 
-// Root endpoint
-app.MapGet("/", () => Results.Ok(new {
+// API v1 endpoints
+var v1 = app.NewVersionedApi("Naglfar Analytics API");
+var v1Group = v1.MapGroup("/api/v{version:apiVersion}").HasApiVersion(1, 0);
+
+v1Group.MapGet("/info", () => Results.Ok(new {
     application = "Naglfar Analytics",
     description = "The ship made of dead men's nails. A bit darker, but represents collection and analysis of threat data.",
-    version = "1.0.0"
+    version = "1.0.0",
+    apiVersion = "1.0"
 }))
-.WithName("Root")
-.WithOpenApi();
+.WithName("GetApplicationInfo")
+.WithSummary("Get application information")
+.WithDescription("Returns application metadata including name, description, and version");
 
 app.Run();

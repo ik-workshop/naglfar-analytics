@@ -36,7 +36,7 @@ run:
 	@echo "Application will be available at: http://localhost:5000"
 	@echo "Health check: http://localhost:5000/healthz"
 	@echo "Readiness check: http://localhost:5000/readyz"
-	dotnet run --project src/NaglfartAnalytics/NaglfartAnalytics.csproj --urls "http://localhost:5000"
+	dotnet run --project src/NaglfartAnalytics/NaglfartAnalytics.csproj --urls "http://localhost:8080"
 
 test:
 	@echo "Running tests..."
