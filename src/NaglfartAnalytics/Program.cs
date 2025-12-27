@@ -1,3 +1,5 @@
+using Prometheus;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -48,6 +50,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+// Prometheus metrics middleware
+app.UseHttpMetrics();
+
 // Health check endpoints (unversioned - infrastructure)
 app.MapGet("/healthz", () => Results.Ok(new { status = "Healthy" }))
     .WithName("HealthCheck")
@@ -56,6 +61,9 @@ app.MapGet("/healthz", () => Results.Ok(new { status = "Healthy" }))
 app.MapGet("/readyz", () => Results.Ok(new { status = "Ready" }))
     .WithName("ReadinessCheck")
     .ExcludeFromDescription();
+
+// Prometheus metrics endpoint (infrastructure)
+app.MapMetrics();
 
 // API v1 endpoints
 var v1 = app.NewVersionedApi("Naglfar Analytics API");

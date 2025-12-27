@@ -11,7 +11,8 @@
       "Bash(dotnet add reference:*)",
       "Bash(dotnet test:*)",
       "Bash(make test:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(dotnet add:*)"
     ]
   }
 }

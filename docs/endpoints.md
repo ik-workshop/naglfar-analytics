@@ -7,6 +7,7 @@ These endpoints are used for health checks and monitoring:
 ```sh
 http://localhost:8080/healthz          # Health check (Kubernetes liveness probe)
 http://localhost:8080/readyz           # Readiness check (Kubernetes readiness probe)
+http://localhost:8080/metrics          # Prometheus metrics endpoint
 ```
 
 ## API Endpoints (Versioned)

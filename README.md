@@ -154,6 +154,10 @@ These endpoints are commonly used by:
 - Monitoring systems
 - Container orchestrators
 
+## Resources
+
+- [Reference Compose](https://docs.docker.com/compose/how-tos/multiple-compose-files/extends/)
+
 ## License
 
 This project is part of the ik-workshop organization.
