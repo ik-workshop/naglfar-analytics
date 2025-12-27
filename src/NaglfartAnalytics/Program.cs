@@ -72,3 +72,6 @@ v1Group.MapGet("/info", () => Results.Ok(new {
 .WithDescription("Returns application metadata including name, description, and version");
 
 app.Run();
+
+// Make the implicit Program class public for WebApplicationFactory<Program> in tests
+public partial class Program { }

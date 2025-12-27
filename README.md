@@ -18,7 +18,7 @@ Naglfar Analytics is a .NET 8.0 web application providing health monitoring and 
 
 ## Prerequisites
 
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) or later
 - [Docker](https://www.docker.com/get-started) (optional, for containerized deployment)
 - [Docker Compose](https://docs.docker.com/compose/) (optional, for orchestration)
 

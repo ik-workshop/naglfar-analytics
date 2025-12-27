@@ -6,7 +6,12 @@
       "Bash(dotnet restore:*)",
       "Bash(dotnet build:*)",
       "Bash(timeout 5 dotnet run:*)",
-      "Bash(dotnet add package:*)"
+      "Bash(dotnet add package:*)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet add reference:*)",
+      "Bash(dotnet test:*)",
+      "Bash(make test:*)",
+      "Bash(cat:*)"
     ]
   }
 }
