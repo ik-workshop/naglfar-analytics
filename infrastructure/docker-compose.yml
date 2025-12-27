@@ -32,6 +32,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8000
+      - SIGNATURE_KEY="0064283c-e357-11f0-b060-6e04387dcc74"
     restart: unless-stopped
     networks:
     - naglfar-network
@@ -60,6 +61,26 @@ services:
       - "traefik.http.routers.book-store-eu.entrypoints=web"
       - "traefik.http.routers.book-store-eu.service=book-store-eu"
       - "traefik.http.services.book-store-eu.loadbalancer.server.port=8000"
+
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "8082:8000"
+    environment:
+      - REGION=europe
+      - SIGNATURE_KEY="0064283c-e357-11f0-b060-6e04387dcc74"
+    restart: unless-stopped
+    networks:
+    - naglfar-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth-service.rule=Host(`auth-service.local`)"
+      - "traefik.http.routers.auth-service.entrypoints=web"
+      - "traefik.http.routers.auth-service.service=auth-service"
+      - "traefik.http.services.auth-service.loadbalancer.server.port=8000"
 
   # whoami:
   #   image: "traefik/whoami"

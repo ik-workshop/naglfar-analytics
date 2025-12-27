@@ -1,0 +1,23 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+gunicorn = "*"
+pydantic = {extras = ["email"], version = "*"}
+email-validator = "*"
+opentelemetry-instrumentation-fastapi = "*"
+python-multipart = "*"
+
+[dev-packages]
+pytest = "*"
+pytest-cov = "*"
+pytest-watch = "*"
+httpx = "*"
+black = "*"
+
+[requires]
+python_version = "3.14"
