@@ -12,7 +12,10 @@
       "Bash(dotnet test:*)",
       "Bash(make test:*)",
       "Bash(cat:*)",
-      "Bash(dotnet add:*)"
+      "Bash(dotnet add:*)",
+      "Bash(make diagrams-check:*)",
+      "Bash(docker --version:*)",
+      "Bash(ls:*)"
     ]
   }
 }

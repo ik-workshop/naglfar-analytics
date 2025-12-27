@@ -1,0 +1,48 @@
+graph TB
+    subgraph Stage1[STAGE 1: COLLECTION - Real-time]
+        ValidationSvc[Naglfar Validation Service<br/>Captures: IP, token, endpoint, query]
+        BookstoreSvc[Book Store Backend<br/>Captures: User actions with email]
+    end
+
+    subgraph Kafka[Message Broker - Apache Kafka]
+        ValidationTopic[naglfar-validation-topic<br/>Request metadata]
+        JourneyTopic[naglfar-user-journey-topic<br/>User actions]
+    end
+
+    subgraph Stage2[STAGE 2: INGESTION - Near real-time &lt; 1s]
+        Worker[Naglfar Worker<br/>.NET Consumer<br/>• Enriches data<br/>• Correlates events]
+    end
+
+    subgraph Storage[Graph Database]
+        Neo4j[(Neo4j<br/>Nodes: IP, Token, Account, Request, Action<br/>Relationships: MADE_REQUEST, USED_TOKEN, etc.)]
+    end
+
+    subgraph Stage3[STAGE 3: ANALYSIS - Batch/Streaming]
+        Analytics[Analytics Worker<br/>Pattern Detection:<br/>• Token reuse<br/>• Similar journeys<br/>• High frequency<br/>• Account compromise]
+    end
+
+    subgraph Stage4[STAGE 4: ACTION - Real-time &lt; 100ms]
+        Redis[(Redis Cache<br/>blocked_ips<br/>blocked_tokens<br/>TTL: 5 min)]
+    end
+
+    ValidationSvc -->|Publish<br/>< 5ms| ValidationTopic
+    BookstoreSvc -->|Publish<br/>< 5ms| JourneyTopic
+
+    ValidationTopic -->|Consume| Worker
+    JourneyTopic -->|Consume| Worker
+
+    Worker -->|Write graph<br/>< 1s| Neo4j
+
+    Neo4j -->|Query patterns<br/>Every 30s-5min| Analytics
+
+    Analytics -->|Write blocks<br/>< 100ms| Redis
+
+    Redis -.->|Check blocks<br/>< 1ms| ValidationSvc
+
+    style Stage1 fill:#e1f5ff
+    style Kafka fill:#e1d5e7
+    style Stage2 fill:#fff4cc
+    style Storage fill:#ffe6cc
+    style Stage3 fill:#d5e8d4
+    style Stage4 fill:#f8cecc
+    style Redis fill:#ffcccc

@@ -1,0 +1,26 @@
+sequenceDiagram
+    participant Client
+    participant Traefik as API Gateway
+    participant Naglfar as Naglfar<br/>Validation
+    participant Redis
+    participant Kafka
+    participant Bookstore as Book Store
+
+    Client->>Traefik: GET /api/v1/books
+    Traefik->>Naglfar: Forward request
+
+    rect rgb(255, 200, 200)
+        Note over Naglfar,Redis: Abuse Detected!
+        Naglfar->>Redis: Check IP hash in blocked_ips?
+        Redis-->>Naglfar: FOUND ✗ (BLOCKED)
+    end
+
+    rect rgb(255, 230, 230)
+        Note over Naglfar,Kafka: Log Block Event
+        Naglfar->>Kafka: Publish<br/>{decision: "block", reason: "ip_blocked"}
+        Naglfar-->>Traefik: 403 Forbidden<br/>{error: "access_denied",<br/>retry_after: 245}
+    end
+
+    Traefik-->>Client: 403 Forbidden
+
+    Note over Bookstore: Request never reaches backend ✓

@@ -1,0 +1,36 @@
+sequenceDiagram
+    participant Client
+    participant Traefik as API Gateway<br/>(Traefik)
+    participant Naglfar as Naglfar<br/>Validation Service
+    participant Redis
+    participant Auth as Auth Service<br/>(Python FastAPI)
+    participant Kafka
+    participant Bookstore as Book Store<br/>(US/EU)
+
+    Note over Client,Bookstore: Initial Request (No auth-token)
+    Client->>Traefik: GET /api/v1/books
+    Traefik->>Naglfar: Forward request
+    Naglfar->>Naglfar: Check auth-token<br/>NOT FOUND
+    Naglfar->>Naglfar: Generate e-token
+    Naglfar->>Redis: Store e-token (TTL: 2min)
+    Naglfar-->>Client: 302 Redirect<br/>Location: auth-service/validate?e_token=xxx
+
+    Note over Client,Auth: E-token Validation
+    Client->>Auth: Follow redirect<br/>GET /validate?e_token=xxx
+    Auth->>Auth: Validate e-token
+    Auth->>Auth: Generate JWT<br/>(sign with shared secret)
+    Auth-->>Client: 302 Redirect<br/>Location: callback?auth_token=jwt
+
+    Note over Client,Bookstore: Authenticated Request
+    Client->>Traefik: GET /api/v1/books<br/>Authorization: Bearer jwt
+    Traefik->>Naglfar: Forward with auth-token
+    Naglfar->>Naglfar: Validate JWT<br/>(shared secret)
+    Naglfar->>Redis: Check blocked_ips<br/>Check blocked_tokens
+    Redis-->>Naglfar: NOT BLOCKED ✓
+    Naglfar->>Naglfar: Capture metadata<br/>(IP hash, token hash, endpoint)
+    Naglfar->>Kafka: Publish (async)<br/>naglfar-validation-topic
+    Naglfar->>Bookstore: Proxy request<br/>(client-side LB)
+    Bookstore->>Bookstore: Process request
+    Bookstore-->>Naglfar: Response
+    Naglfar-->>Traefik: Response
+    Traefik-->>Client: Response

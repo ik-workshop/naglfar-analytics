@@ -1,0 +1,35 @@
+architecture-beta
+    group request_path(cloud)[Request Path]
+    group validation(shield)[Validation & Auth]
+    group analytics_path(cogs)[Analytics Path]
+    group decision_path(database)[Decision Path]
+
+    service client(internet)[Client Request] in request_path
+    service naglfar_in(shield)[Naglfar<br/>Validation] in validation
+    service redis_check(database)[Redis<br/>Block Check] in validation
+    service auth_svc(lock)[Auth Service<br/>JWT] in validation
+    service backend(server)[Book Store<br/>Backend] in request_path
+
+    service kafka_pub(disk)[Kafka<br/>Publisher] in analytics_path
+    service kafka_sub(disk)[Kafka<br/>Consumer] in analytics_path
+    service neo4j_write(database)[Neo4j<br/>Writer] in analytics_path
+    service neo4j_read(database)[Neo4j<br/>Pattern Query] in analytics_path
+    service analytics_eng(cogs)[Analytics<br/>Engine] in analytics_path
+
+    service redis_write(database)[Redis<br/>Block Writer] in decision_path
+    service redis_read(database)[Redis<br/>Block Reader] in decision_path
+
+    client:R --> L:naglfar_in
+    naglfar_in:B --> T:redis_check
+    naglfar_in:T --> B:auth_svc
+    redis_check:R --> L:naglfar_in
+    naglfar_in:R --> L:backend
+
+    naglfar_in:B --> T:kafka_pub
+    backend:B --> T:kafka_pub
+    kafka_pub:R --> L:kafka_sub
+    kafka_sub:R --> L:neo4j_write
+    neo4j_write:R --> L:neo4j_read
+    neo4j_read:R --> L:analytics_eng
+    analytics_eng:B --> T:redis_write
+    redis_write:L --> R:redis_read

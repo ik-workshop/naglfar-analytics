@@ -1,22 +1,3 @@
-# Default target
-# help:
-# 	@echo "Naglfar Analytics - Makefile Commands"
-# 	@echo "======================================"
-# 	@echo "Local Development (without Docker):"
-# 	@echo "  make restore       - Restore .NET dependencies"
-# 	@echo "  make build         - Build the application"
-# 	@echo "  make run           - Run the application locally"
-# 	@echo "  make test          - Run tests"
-# 	@echo "  make clean         - Clean build artifacts"
-# 	@echo ""
-# 	@echo "Docker Commands:"
-# 	@echo "  make docker-build  - Build Docker image"
-# 	@echo "  make docker-run    - Run application in Docker"
-# 	@echo "  make docker-stop   - Stop Docker containers"
-# 	@echo "  make docker-clean  - Remove Docker images and containers"
-# 	@echo "  make docker-up     - Build and run with docker-compose"
-# 	@echo "  make docker-down   - Stop and remove docker-compose containers"
-
 .PHONY: help
 #? help: Get more info on available commands
 help: Makefile
@@ -125,3 +106,48 @@ api-rebuild:
 #? apigw-restart: rebuild and restart traefik
 apigw-restart:
 	@docker compose -f docker-compose.yml up -d --build api-gateway
+
+# Diagram commands
+DIAGRAMS_DIR := docs/assets/diagrams
+DIAGRAMS_SRC := $(wildcard $(DIAGRAMS_DIR)/*.mmd)
+DIAGRAMS_SVG := $(DIAGRAMS_SRC:.mmd=.svg)
+MERMAID_CLI_VERSION := 11.12.0
+MERMAID_CLI_IMAGE := minlag/mermaid-cli:$(MERMAID_CLI_VERSION)
+
+#? diagrams: Generate SVG images from Mermaid diagrams
+diagrams: $(DIAGRAMS_SVG)
+	@echo "✓ All diagrams generated successfully!"
+	@echo "  Generated $(words $(DIAGRAMS_SVG)) SVG files in $(DIAGRAMS_DIR)/"
+
+$(DIAGRAMS_DIR)/%.svg: $(DIAGRAMS_DIR)/%.mmd
+	@echo "Generating $@..."
+	@docker run --rm -v $(PWD):/data $(MERMAID_CLI_IMAGE) \
+		-i /data/$< -o /data/$@ -b transparent -t neutral
+
+#? diagrams-validate: Validate Mermaid diagrams by attempting to render them
+diagrams-validate:
+	@echo "Validating Mermaid diagrams (attempting render)..."
+	@failed=0; \
+	for file in $(DIAGRAMS_SRC); do \
+		echo "  Validating $$(basename $$file)..."; \
+		if docker run --rm -v $(PWD):/data $(MERMAID_CLI_IMAGE) \
+			-i /data/$$file -o /tmp/$$(basename $$file .mmd).svg \
+			-b transparent -t neutral > /dev/null 2>&1; then \
+			echo "    ✓ Valid"; \
+		else \
+			echo "    ✗ Invalid syntax"; \
+			failed=1; \
+		fi; \
+	done; \
+	if [ $$failed -eq 0 ]; then \
+		echo "✓ All $(words $(DIAGRAMS_SRC)) diagrams are valid!"; \
+	else \
+		echo "✗ Some diagrams have syntax errors"; \
+		exit 1; \
+	fi
+
+#? diagrams-clean: Remove generated SVG files
+diagrams-clean:
+	@echo "Cleaning generated SVG files..."
+	@rm -f $(DIAGRAMS_DIR)/*.svg
+	@echo "✓ Cleaned $(DIAGRAMS_DIR)/"

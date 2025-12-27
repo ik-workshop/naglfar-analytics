@@ -12,7 +12,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       # - "--providers.docker.network=naglfar-network"
       - "--entryPoints.web.address=:80"
-      - "--log.level=DEBUG"
+      - "--log.level=INFO"
       - "--metrics.prometheus=true"
       # - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
       - "--metrics.prometheus.addserviceslabels=true"

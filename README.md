@@ -153,6 +153,7 @@ These endpoints are commonly used by:
 - [Traefik Expose Services](https://doc.traefik.io/traefik/expose/docker/)
 - [Traefik Examples](https://github.com/ik-infrastructure-testing/traefik-examples-fork)
 - [Traefik Routes](https://doc.traefik.io/traefik/reference/routing-configuration/http/routing/rules-and-priority/#rule)
+- [Mermaid diagrams cli](https://github.com/mermaid-js/mermaid-cli)
 
 ## License
 

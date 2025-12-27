@@ -1,0 +1,26 @@
+architecture-beta
+    group sources(cloud)[Data Sources]
+    group collection(server)[Collection Layer]
+    group transport(disk)[Transport Layer]
+    group processing(cogs)[Processing Layer]
+    group persistence(database)[Persistence Layer]
+    group enforcement(shield)[Enforcement Layer]
+
+    service validation(server)[Validation Service<br/>Request Metadata] in sources
+    service bookstore(server)[Book Store<br/>User Actions] in sources
+    service kafka_validation(disk)[Kafka Topic<br/>naglfar-validation] in transport
+    service kafka_journey(disk)[Kafka Topic<br/>naglfar-journey] in transport
+    service worker(cogs)[Naglfar Worker<br/>Enrichment] in processing
+    service analytics(cogs)[Analytics Worker<br/>Pattern Detection] in processing
+    service neo4j(database)[Neo4j<br/>Graph Storage] in persistence
+    service redis(database)[Redis<br/>Block Lists] in persistence
+    service enforcer(shield)[Validation Service<br/>Block Enforcement] in enforcement
+
+    validation:B --> T:kafka_validation
+    bookstore:B --> T:kafka_journey
+    kafka_validation:R --> L:worker
+    kafka_journey:R --> L:worker
+    worker:B --> T:neo4j
+    neo4j:R --> L:analytics
+    analytics:B --> T:redis
+    redis:R --> L:enforcer

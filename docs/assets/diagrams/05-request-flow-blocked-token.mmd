@@ -1,0 +1,25 @@
+sequenceDiagram
+    participant Client
+    participant Traefik as API Gateway
+    participant Naglfar as Naglfar<br/>Validation
+    participant Redis
+    participant Kafka
+
+    Client->>Traefik: GET /api/v1/books<br/>Authorization: Bearer token
+    Traefik->>Naglfar: Forward request
+
+    rect rgb(255, 200, 200)
+        Note over Naglfar,Redis: Token Compromise Detected!
+        Naglfar->>Redis: Check IP hash in blocked_ips?
+        Redis-->>Naglfar: NOT FOUND ✓
+        Naglfar->>Redis: Check token hash in blocked_tokens?
+        Redis-->>Naglfar: FOUND ✗ (BLOCKED)
+    end
+
+    rect rgb(255, 230, 230)
+        Note over Naglfar,Kafka: Log Block Event
+        Naglfar->>Kafka: Publish<br/>{decision: "block", reason: "token_compromised"}
+        Naglfar-->>Traefik: 401 Unauthorized<br/>{error: "token_revoked"}
+    end
+
+    Traefik-->>Client: 401 Unauthorized<br/>Must re-authenticate

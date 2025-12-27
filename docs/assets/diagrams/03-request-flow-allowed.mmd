@@ -1,0 +1,34 @@
+sequenceDiagram
+    participant Client
+    participant Traefik as API Gateway
+    participant Naglfar as Naglfar<br/>Validation
+    participant Redis
+    participant Kafka
+    participant Bookstore as Book Store
+
+    Client->>Traefik: GET /api/v1/books<br/>Authorization: Bearer token
+    Traefik->>Naglfar: Forward request
+
+    rect rgb(200, 255, 200)
+        Note over Naglfar,Redis: Abuse Check (< 1ms)
+        Naglfar->>Redis: Check IP hash in blocked_ips?
+        Redis-->>Naglfar: NOT FOUND ✓
+        Naglfar->>Redis: Check token hash in blocked_tokens?
+        Redis-->>Naglfar: NOT FOUND ✓
+    end
+
+    rect rgb(200, 230, 255)
+        Note over Naglfar,Kafka: Metadata Capture & Publish
+        Naglfar->>Naglfar: Capture metadata<br/>(IP, token, endpoint, query)
+        Naglfar->>Kafka: Publish (async)<br/>naglfar-validation-topic
+    end
+
+    rect rgb(255, 240, 200)
+        Note over Naglfar,Bookstore: Proxy to Backend
+        Naglfar->>Bookstore: Proxy (client-side LB)<br/>Choose US or EU region
+        Bookstore->>Bookstore: Process request
+        Bookstore-->>Naglfar: 200 OK + Response
+    end
+
+    Naglfar-->>Traefik: Response
+    Traefik-->>Client: Response

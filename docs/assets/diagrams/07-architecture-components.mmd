@@ -1,0 +1,35 @@
+architecture-beta
+    group internet(cloud)[Internet Layer]
+    group gateway(server)[API Gateway Layer]
+    group protection(shield)[Naglfar Protection Layer]
+    group auth(lock)[Authentication Layer]
+    group backend(server)[Backend Services]
+    group messaging(disk)[Message Broker]
+    group workers(cogs)[Processing Workers]
+    group storage(database)[Data Storage]
+
+    service client(internet)[Client] in internet
+    service traefik(server)[Traefik v3.6] in gateway
+    service naglfar(shield)[Naglfar Validation<br/>.NET 10.0] in protection
+    service authsvc(lock)[Auth Service<br/>Python FastAPI] in auth
+    service bookus(server)[Book Store US] in backend
+    service bookeu(server)[Book Store EU] in backend
+    service kafka(disk)[Apache Kafka] in messaging
+    service worker(cogs)[Naglfar Worker<br/>.NET] in workers
+    service analytics(cogs)[Analytics Worker] in workers
+    service neo4j(database)[Neo4j<br/>Graph DB] in storage
+    service redis(database)[Redis Cache] in storage
+
+    client:R --> L:traefik
+    traefik:R --> L:naglfar
+    naglfar:T --> B:authsvc
+    naglfar:R --> L:bookus
+    naglfar:R --> L:bookeu
+    naglfar:B --> T:redis
+    naglfar:B --> T:kafka
+    bookus:B --> T:kafka
+    bookeu:B --> T:kafka
+    kafka:R --> L:worker
+    worker:B --> T:neo4j
+    neo4j:R --> L:analytics
+    analytics:B --> T:redis

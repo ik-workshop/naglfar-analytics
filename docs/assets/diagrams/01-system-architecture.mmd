@@ -1,0 +1,65 @@
+graph TB
+    Internet[INTERNET<br/>Public Traffic]
+
+    subgraph API_Layer[API Layer]
+        Traefik[API Gateway<br/>Traefik v3.6<br/>TLS Termination<br/>Routing]
+    end
+
+    subgraph Naglfar_Layer[Naglfar Protection Layer]
+        ValidationService[Naglfar Validation Service<br/>.NET 10.0<br/>1. Check auth-token<br/>2. Validate with Redis<br/>3. Capture metadata<br/>4. Publish to Kafka<br/>5. Proxy to backend]
+    end
+
+    subgraph Auth_Layer[Authentication]
+        AuthService[Auth Service<br/>Python FastAPI<br/>3rd Party<br/>E-token validation<br/>JWT generation]
+    end
+
+    subgraph Backend_Layer[Backend Services]
+        BookstoreUS[Book Store US<br/>Inventory, Cart<br/>Checkout, Orders]
+        BookstoreEU[Book Store EU<br/>Inventory, Cart<br/>Checkout, Orders]
+    end
+
+    subgraph Message_Layer[Message Broker]
+        Kafka[Apache Kafka<br/>Topics:<br/>- naglfar-validation-topic<br/>- naglfar-user-journey-topic]
+    end
+
+    subgraph Worker_Layer[Processing Workers]
+        NagWorker[Naglfar Worker<br/>.NET Consumer<br/>Kafka → Neo4j<br/>Event correlation]
+        AnalyticsWorker[Analytics Worker<br/>Pattern Detection<br/>Neo4j → Redis<br/>Abuse detection]
+    end
+
+    subgraph Storage_Layer[Data Storage]
+        Neo4j[(Neo4j<br/>Graph Database<br/>Request metadata<br/>User journeys<br/>Relationships)]
+        Redis[(Redis Cache<br/>Blocked IPs<br/>Blocked tokens<br/>Raw / Bloom filter)]
+    end
+
+    Internet -->|HTTPS| Traefik
+    Traefik -->|HTTP| ValidationService
+
+    ValidationService -.->|No auth-token<br/>302 Redirect| AuthService
+    AuthService -.->|auth-token<br/>302 Redirect| ValidationService
+
+    ValidationService -->|Check blocks<br/>< 1ms| Redis
+    ValidationService -->|Async publish<br/>metadata| Kafka
+    ValidationService -->|Proxy request<br/>Client-side LB| BookstoreUS
+    ValidationService -->|Proxy request<br/>Client-side LB| BookstoreEU
+
+    BookstoreUS -->|User actions<br/>with email| Kafka
+    BookstoreEU -->|User actions<br/>with email| Kafka
+
+    Kafka -->|Consume| NagWorker
+    NagWorker -->|Write graph| Neo4j
+
+    Neo4j -->|Pattern queries| AnalyticsWorker
+    AnalyticsWorker -->|Write blocks<br/>TTL: 5min| Redis
+
+    style Internet fill:#e1f5ff
+    style Traefik fill:#ffe6cc
+    style ValidationService fill:#d5e8d4
+    style AuthService fill:#fff4cc
+    style BookstoreUS fill:#f8cecc
+    style BookstoreEU fill:#f8cecc
+    style Kafka fill:#e1d5e7
+    style NagWorker fill:#dae8fc
+    style AnalyticsWorker fill:#dae8fc
+    style Neo4j fill:#ffe6cc
+    style Redis fill:#ffe6cc
