@@ -10,7 +10,6 @@ services:
       - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      # - "--providers.docker.network=naglfar-network"
       - "--entryPoints.web.address=:80"
       - "--log.level=INFO"
       - "--metrics.prometheus=true"
@@ -42,6 +41,25 @@ services:
       - "traefik.http.routers.apivone.entrypoints=web"
       - "traefik.http.routers.apivone.service=apivone"
       - "traefik.http.services.apivone.loadbalancer.server.port=8000"
+
+  protected-service-eu:
+    build:
+      context: ../services/book-store
+      dockerfile: Dockerfile
+    container_name: book-store-eu
+    ports:
+      - "8081:8000"
+    environment:
+      - REGION=europe
+    restart: unless-stopped
+    networks:
+    - naglfar-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.book-store-eu.rule=Host(`book-store-eu.local`)"
+      - "traefik.http.routers.book-store-eu.entrypoints=web"
+      - "traefik.http.routers.book-store-eu.service=book-store-eu"
+      - "traefik.http.services.book-store-eu.loadbalancer.server.port=8000"
 
   # whoami:
   #   image: "traefik/whoami"

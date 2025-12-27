@@ -13,7 +13,7 @@ curl http://localhost:8000/metrics          # Prometheus metrics endpoint
 curl http://localhost:8000/api/v1/info
 ```
 
-### Over traefik
+### Over Treafik/Gateway
 
 ```sh
 curl -H "Host: api.local" http://localhost/healthz
@@ -21,6 +21,17 @@ curl -H "Host: api.local" http://localhost/metrics
 curl -H "Host: api.local" http://localhost/api/v1/info
 ```
 
+## Book Store endpoint
+
+### Direct
+
+### Over Treafik/Gateway
+
+```sh
+curl -H "Host: book-store-eu.local" http://localhost/healthz
+curl -H "Host: book-store-eu.local" http://localhost/info
+curl -H "Host: book-store-eu.local" http://localhost/metrics
+```
 
 ## Traefik
 

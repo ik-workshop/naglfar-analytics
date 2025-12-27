@@ -2,7 +2,7 @@
 BOOK_STORE_DIR := services/book-store
 
 compose-rebuild-book-store: ## Rebuild and restart web-app service
-	docker-compose -f infrastructure/docker-compose.yml up -d --build book-store
+	docker-compose -f infrastructure/docker-compose.yml up -d --build protected-service-eu
 
 docker-run-book-store: ## Run the Docker container for the book-store service
 	@docker run --rm -it -p 8090:8000 book-store

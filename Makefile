@@ -12,6 +12,7 @@ MERMAID_CLI_IMAGE := minlag/mermaid-cli:$(MERMAID_CLI_VERSION)
 help:
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
+-include infrastructure/helpers.mk
 -include services/book-store/helpers.mk
 -include services/naglfar-validation/helpers.mk
 
@@ -65,32 +66,6 @@ clean: ## Clean build artifacts
 	rm -rf services/naglfar-validation/src/NaglfartAnalytics/bin services/naglfar-validation/src/NaglfartAnalytics/obj
 	rm -rf services/naglfar-validation/tests/NaglfartAnalytics.Tests/bin services/naglfar-validation/tests/NaglfartAnalytics.Tests/obj
 	rm -rf coverage
-
-#? compose-up: Build and run with docker-compose
-compose-up:
-	@echo "Starting application with docker-compose..."
-	@echo "Application will be available at: http://localhost:8080"
-	@echo "Health check: http://localhost:8080/healthz"
-	@echo "Readiness check: http://localhost:8080/readyz"
-	docker-compose -f infrastructure/docker-compose.yml up --build
-
-#? compose-down: Stop and remove docker-compose containers
-compose-down:
-	@echo "Stopping docker-compose services..."
-	docker-compose -f infrastructure/docker-compose.yml down
-
-#? compose-logs: show logs for docker-compose containers
-compose-logs:
-	@echo "Showing docker-compose logs..."
-	docker-compose -f infrastructure/docker-compose.yml logs -f
-
-#? validation-rebuild: rebuild naglfar-validation service
-validation-rebuild:
-	@docker compose -f infrastructure/docker-compose.yml up -d --build naglfar-validation
-
-#? apigw-restart: rebuild and restart traefik
-apigw-restart:
-	@docker compose -f infrastructure/docker-compose.yml up -d --build api-gateway
 
 diagrams: $(DIAGRAMS_SVG) ## Generate SVG images from Mermaid diagrams
 	@echo "✓ All diagrams generated successfully!"
