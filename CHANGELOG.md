@@ -91,6 +91,162 @@ A multi-service authentication and analytics platform providing **event-driven a
 
 ## Changelog
 
+### 2025-12-28 (Part 4) - Event Publishing Infrastructure & Event Specification
+
+#### Added
+
+- **✅ Event Publishing in book-store Service** (`services/book-store/`):
+  - **Event Helper Module**: Created `src/message/event_helper.py` for reusable event publishing logic
+  - **Events Published**: 15 endpoints now publish events to Redis after successful operations
+  - **Event Categories**:
+    - Browse: `view_books`, `search_books`, `view_book_detail`
+    - Authentication: `user_register`, `user_login`
+    - Cart: `view_cart`, `add_to_cart`, `remove_from_cart`
+    - Orders: `checkout`, `view_order`, `view_orders`
+    - Inventory: `check_inventory`
+    - Store: `list_stores`
+  - **Event Structure**: session_id, store_id, action, timestamp, user_id, auth_token_id, data
+  - **Implementation Patterns**:
+    - Pattern A: Unauthenticated endpoints (11 endpoints) - user_id=None
+    - Pattern B: Authenticated endpoints (6 endpoints) - user_id from get_current_user()
+    - Pattern C: Auth endpoints (2 endpoints) - token in response, special handling
+  - **Error Handling**: Events wrapped in try-catch, failures logged but don't block responses
+
+- **✅ Event Specification** (`services/event.yaml`):
+  - **Comprehensive Event Documentation**: YAML specification file for all event types
+  - **Event Categories**: browse, authentication, cart, order, inventory, store, error
+  - **Field Requirements**: Documents required vs optional fields per event type
+  - **Data Schemas**: Event-specific payload structures
+  - **Field Definitions**: Complete reference with types and examples
+  - **Integration**: Used by both book-store and auth-service
+
+- **✅ YAML-Based Configuration** (`services/book-store/`, `services/auth-service/`):
+  - **Initial Data**: `initial-data.yaml` with 11 books and 10 store locations
+  - **Test Users**: `users.yaml` with 50 test user accounts (sequential IDs 1-50)
+  - **Database Loading**: Updated `database.py` to load from YAML instead of hardcoded data
+  - **Benefits**: Easier testing, configuration management, data seeding
+
+- **✅ API Route Documentation** (`services/book-store/routes.yaml`, `services/auth-service/routes.yaml`):
+  - **Complete Endpoint Specs**: Method, path, description, auth requirements
+  - **Header Requirements**: AUTH_TOKEN, AUTH_TOKEN_ID (required), SESSION_ID (optional)
+  - **Event Specifications**: Per-endpoint event field requirements with status and description
+  - **Action Types**: Documented action constants from `events.py`
+  - **Response Formats**: Expected response structures
+
+- **✅ Route Validation System** (`services/book-store/src/validation/`):
+  - **Spec Loader**: `spec_loader.py` - parses routes.yaml specifications
+  - **Introspection**: `introspection.py` - analyzes actual FastAPI routes at runtime
+  - **Validator**: `validator.py` - compares spec vs actual implementation
+  - **Enforcement**: `enforcement.py` - runtime header validation middleware
+  - **Startup Validation**: Ensures routes comply with specifications before service starts
+
+- **✅ Session & Context Middleware** (`services/book-store/src/middleware.py`):
+  - **SessionMiddleware**: Generates/tracks SESSION_ID using UUID v7
+  - **RequestContextMiddleware**: Extracts store_id from URL path
+  - **Context Storage**: Stores session_id, store_id in request.state for event publishing
+  - **Auto-generation**: SESSION_ID auto-generated if not provided in headers
+
+- **✅ Auth Service User Loading** (`services/auth-service/src/utils.py`):
+  - **User Loading Functions**: `load_users()`, `get_random_user()`, `get_user_by_email()`, `get_user_by_id()`
+  - **User Caching**: Caches loaded users for performance
+  - **Random Selection**: Auth endpoints use random users from `users.yaml` for testing
+  - **YAML Integration**: Added pyyaml dependency to Pipfile
+
+#### Changed
+
+- **✅ Event Consumer Simplified** (`services/naglfar-event-consumer/src/NaglfartEventConsumer/Services/RedisEventConsumer.cs`):
+  - **Refactored Processing**: Removed category-specific handlers, unified to single flexible logic
+  - **Flexible Field Extraction**: Handles events with varying field requirements gracefully
+  - **Validation**: Only validates core required fields (session_id, action)
+  - **Null-Safe Logging**: Shows optional fields as "null" when missing
+  - **Categorization**: Simple switch statement for metrics/logging (browse, auth, cart, order, inventory, store, error)
+  - **Error Handling**: Improved validation and error metric recording
+
+- **✅ Event Consumer Tests** (`services/naglfar-event-consumer/tests/.../Services/RedisEventConsumerTests.cs`):
+  - **Comprehensive Coverage**: 15+ test cases for all event categories
+  - **Field Variations**: Tests events with complete and minimal field sets
+  - **Authentication States**: Validates authenticated vs unauthenticated event flows
+  - **Auth-Service Events**: Tests e_token_validation, user_authorize specific events
+  - **Validation Tests**: Ensures missing required fields are caught
+  - **Data Parsing**: Validates event-specific data field parsing
+
+- **✅ book-store Service Updates**:
+  - **All Routers**: Updated to accept Request parameter for event publishing
+  - **books.py**: Added events to list_books(), get_book()
+  - **auth.py**: Special handling for register(), login() - token in response
+  - **cart.py**: Added events to get_cart(), add_to_cart(), remove_from_cart()
+  - **orders.py**: Added events to checkout(), get_order(), list_orders()
+  - **inventory.py**: Added events to check_inventory()
+  - **app.py**: Added events to list_stores()
+
+#### Technical Details
+
+**Event Publishing Flow**:
+1. Request hits endpoint → SessionMiddleware generates/extracts SESSION_ID
+2. RequestContextMiddleware extracts store_id from URL
+3. Endpoint executes business logic
+4. On success, `publish_endpoint_event()` called with action type
+5. Helper extracts context from request.state and headers
+6. Event published to Redis with all available fields
+7. Response returned to client
+
+**Event Field Requirements**:
+- **Always Required**: session_id, action
+- **Required for authenticated**: user_id, auth_token_id
+- **Optional**: store_id (depends on endpoint), data (endpoint-specific)
+
+**Event Categories**:
+```
+browse        → view_books, search_books, view_book_detail
+authentication → user_register, user_login, e_token_validation, auth_token_generation
+cart          → view_cart, add_to_cart, remove_from_cart
+order         → checkout, view_order, view_orders
+inventory     → check_inventory
+store         → list_stores
+error         → not_found, unauthorized, error
+```
+
+#### Files Modified
+
+**book-store Service**:
+- `src/message/event_helper.py` (NEW) - Event publishing helper
+- `src/routers/books.py` - Added event publishing (2 endpoints)
+- `src/routers/auth.py` - Added event publishing with special handling (2 endpoints)
+- `src/routers/cart.py` - Added event publishing (3 endpoints)
+- `src/routers/orders.py` - Added event publishing (3 endpoints)
+- `src/routers/inventory.py` - Added event publishing (1 endpoint)
+- `src/app.py` - Added event publishing (1 endpoint)
+- `src/storage/database.py` - YAML loading instead of hardcoded data
+- `src/middleware.py` (NEW) - Session and context middleware
+- `src/validation/` (NEW) - Complete validation framework
+- `initial-data.yaml` (NEW) - Books and stores configuration
+- `users.yaml` (NEW) - Test user accounts
+- `routes.yaml` (NEW) - API documentation with event specs
+
+**auth-service**:
+- `src/utils.py` - User loading functions
+- `src/routers/auth.py` - Random user selection
+- `routes.yaml` (NEW) - API documentation
+- `users.yaml` (NEW) - Test user accounts
+- `Pipfile` - Added pyyaml dependency
+
+**naglfar-event-consumer**:
+- `src/NaglfartEventConsumer/Services/RedisEventConsumer.cs` - Simplified processing logic
+- `tests/.../Services/RedisEventConsumerTests.cs` (NEW) - Comprehensive test suite
+
+**Project Root**:
+- `services/event.yaml` (NEW) - Event specification documentation
+
+#### Metrics
+
+- **Events Published**: 15 endpoint types across book-store service
+- **Test Coverage**: 15+ test cases for event consumer
+- **Test Users**: 50 user accounts available for testing
+- **Event Categories**: 7 categories (browse, auth, cart, order, inventory, store, error)
+- **Action Types**: 16+ distinct action types documented
+
+---
+
 ### 2025-12-28 (Part 2) - Prometheus Metrics & Configurable Logging
 
 #### Added

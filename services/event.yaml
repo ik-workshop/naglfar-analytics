@@ -1,0 +1,351 @@
+# Event Specifications
+# This file documents the structure and field requirements for events published to Redis
+
+# Common Event Structure:
+# All events follow the BookStoreEvent schema with these fields:
+# - session_id: string (required) - Session identifier
+# - store_id: string (optional) - Store identifier
+# - action: string (required) - Action type being performed
+# - timestamp: datetime (required) - When event was captured (ISO 8601 format)
+# - user_id: int (optional) - User account ID (null for unauthenticated)
+# - auth_token_id: string (optional) - Authentication token ID
+# - data: object (optional) - Additional event-specific data
+
+event_categories:
+  # Browse Events - User browsing books catalog
+  browse:
+    description: "Events related to browsing and searching the book catalog"
+    actions:
+      - view_books:
+          description: "User views list of books"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - auth_token_id
+          optional_fields:
+            - user_id
+            - data
+          data_schema:
+            category: "string - Book category filter (if applied)"
+
+      - search_books:
+          description: "User searches for books"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - auth_token_id
+          optional_fields:
+            - user_id
+            - data
+          data_schema:
+            search_term: "string - Search query"
+            category: "string - Category filter (optional)"
+
+      - view_book_detail:
+          description: "User views details of a specific book"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - auth_token_id
+          optional_fields:
+            - user_id
+            - data
+          data_schema:
+            book_id: "int - Book identifier"
+
+  # Authentication Events - User authentication and authorization
+  authentication:
+    description: "Events related to user authentication and session management"
+    actions:
+      - user_register:
+          description: "New user registration"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+          optional_fields:
+            - data
+          data_schema:
+            email: "string - User email address"
+
+      - user_login:
+          description: "User login"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+          optional_fields:
+            - data
+          data_schema:
+            email: "string - User email address"
+
+      - e_token_validation:
+          description: "E-TOKEN validation from naglfar-validation (auth-service)"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - auth_token_id
+          optional_fields:
+            - user_id
+            - data
+          data_schema:
+            e_token_expiry: "string - E-TOKEN expiration timestamp"
+            return_url: "string - Original URL user was accessing"
+
+      - auth_token_generation:
+          description: "AUTH-TOKEN generation (auth-service)"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+          optional_fields:
+            - data
+          data_schema:
+            store_id: "string - Store identifier"
+
+      - user_authorize:
+          description: "User authorization/registration (auth-service)"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+          optional_fields:
+            - data
+          data_schema:
+            email: "string - User email"
+
+      - user_authenticate:
+          description: "User authentication/login (auth-service)"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+          optional_fields:
+            - data
+          data_schema:
+            email: "string - User email"
+
+  # Cart Events - Shopping cart operations
+  cart:
+    description: "Events related to shopping cart management"
+    actions:
+      - view_cart:
+          description: "User views their cart"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+          optional_fields:
+            - data
+
+      - add_to_cart:
+          description: "User adds item to cart"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+            - data
+          optional_fields: []
+          data_schema:
+            book_id: "int - Book identifier"
+            quantity: "int - Quantity added"
+
+      - remove_from_cart:
+          description: "User removes item from cart"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+            - data
+          optional_fields: []
+          data_schema:
+            cart_item_id: "int - Cart item identifier"
+
+  # Order Events - Order processing and checkout
+  order:
+    description: "Events related to order creation and management"
+    actions:
+      - checkout:
+          description: "User completes checkout"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+            - data
+          optional_fields: []
+          data_schema:
+            order_id: "int - Created order identifier"
+            total_amount: "float - Order total amount"
+            payment_method: "string - Payment method used"
+
+      - view_order:
+          description: "User views order details"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+            - data
+          optional_fields: []
+          data_schema:
+            order_id: "int - Order identifier"
+
+      - view_orders:
+          description: "User views their order history"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - user_id
+            - auth_token_id
+          optional_fields:
+            - data
+
+  # Inventory Events - Stock and inventory checks
+  inventory:
+    description: "Events related to inventory and stock management"
+    actions:
+      - check_inventory:
+          description: "User checks inventory availability"
+          required_fields:
+            - session_id
+            - store_id
+            - action
+            - timestamp
+            - auth_token_id
+          optional_fields:
+            - user_id
+            - data
+          data_schema:
+            book_id: "int - Specific book ID (optional, null means all books)"
+
+  # Store Events - Store browsing and selection
+  store:
+    description: "Events related to store browsing and selection"
+    actions:
+      - list_stores:
+          description: "User lists available stores"
+          required_fields:
+            - session_id
+            - action
+            - timestamp
+            - auth_token_id
+          optional_fields:
+            - store_id
+            - user_id
+            - data
+
+  # Error Events - Error and exception tracking
+  error:
+    description: "Events related to errors and exceptional conditions"
+    actions:
+      - not_found:
+          description: "404 Not Found error"
+          required_fields:
+            - session_id
+            - action
+            - timestamp
+          optional_fields:
+            - store_id
+            - user_id
+            - auth_token_id
+            - data
+
+      - unauthorized:
+          description: "401 Unauthorized error"
+          required_fields:
+            - session_id
+            - action
+            - timestamp
+          optional_fields:
+            - store_id
+            - user_id
+            - auth_token_id
+            - data
+
+      - error:
+          description: "Generic error event"
+          required_fields:
+            - session_id
+            - action
+            - timestamp
+          optional_fields:
+            - store_id
+            - user_id
+            - auth_token_id
+            - data
+
+# Field Definitions:
+field_definitions:
+  session_id:
+    type: string
+    description: "Unique session identifier (UUID v7)"
+    example: "01963852-c3c4-7b4a-a9e3-7f8c5d6e4f3a"
+
+  store_id:
+    type: string
+    description: "Store identifier"
+    example: "store-1"
+
+  action:
+    type: string
+    description: "Action type being performed"
+    example: "view_books"
+
+  timestamp:
+    type: datetime
+    description: "Event timestamp in ISO 8601 format"
+    example: "2025-12-28T10:30:00.000Z"
+
+  user_id:
+    type: integer
+    description: "User account identifier (null for unauthenticated)"
+    example: 123
+
+  auth_token_id:
+    type: string
+    description: "Authentication token identifier (SHA256 hash or actual token)"
+    example: "abc123def456..."
+
+  data:
+    type: object
+    description: "Additional event-specific data (JSON object)"
+    example: { "book_id": 1, "quantity": 2 }
