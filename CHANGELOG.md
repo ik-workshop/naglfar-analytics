@@ -91,6 +91,135 @@ A multi-service authentication and analytics platform providing **event-driven a
 
 ## Changelog
 
+### 2025-12-28 (Part 6) - Graph Database Model & naglfar-validation Event Publishing
+
+#### Added
+
+- **✅ Graph Database Data Model** (`docs/graph-db-data-model.md`):
+  - **Comprehensive Design Document**: Complete graph database model for storing events in Neo4j
+  - **Entity Model**: 6 core entities for abuse detection:
+    - `IPAddress` - Client IP tracking with blocking and geolocation
+    - `UserAgent` - Browser/bot detection with parsed metadata
+    - `Session` - Session tracking with hijacking detection
+    - `User` - Account-level tracking with lockout capabilities
+    - `Store` - Store/tenant metrics and abuse tracking
+    - `Event` - Raw event preservation for audit trail
+  - **Relationship Model**: 11 relationship types connecting entities:
+    - ORIGINATES_FROM, FAILED_AUTH, USES_AGENT, IN_SESSION
+    - USED_IP, USED_AGENT, AUTHENTICATED_AS, BELONGS_TO
+    - LOGGED_IN_FROM, FOR_STORE, VISITED_STORE, NEXT_EVENT
+  - **Abuse Detection Queries**: 8 pre-built Cypher queries:
+    1. Brute Force Detection (>10 failed auth in 5 min)
+    2. Session Hijacking (multiple IPs per session)
+    3. DDoS Detection (>100 requests/min from IP)
+    4. Bot Detection (high request rate patterns)
+    5. Credential Stuffing (IP trying multiple accounts)
+    6. Rapid Request Detection (events <100ms apart)
+    7. Endpoint Abuse Detection (excessive hits to single endpoint)
+    8. Geographic Anomaly Detection (impossible travel)
+  - **Design Rationale**: Connected objects vs raw events, O(1) relationship lookups
+  - **Performance Optimization**: Indexes and constraints on all key properties
+
+- **✅ Graph Model Specification** (`services/graph-model.yml`):
+  - **YAML Specification**: Complete graph database schema in YAML format
+  - **Entity Definitions**: All 6 entities with properties, types, constraints
+  - **Relationship Definitions**: All 11 relationships with properties and metadata
+  - **Index Specifications**: Unique constraints and indexes for performance
+  - **Event Category Mapping**: Maps event.yaml actions to categories (auth, commerce, navigation)
+  - **Abuse Pattern Specifications**: Pre-configured detection patterns with thresholds
+  - **Property Metadata**: Required/optional flags, defaults, indexed fields, unique constraints
+
+- **✅ naglfar-validation Event Publishing** (`services/naglfar-validation/`):
+  - **e_token_created Event**: Published when E-TOKEN is created for unauthenticated users
+    - Fields: store_id, action, timestamp, auth_token_id, client_ip, user_agent, location, path, query
+    - Data: e_token_expiry, return_url
+    - Published from: `AuthenticationMiddleware.cs:141-150`
+  - **auth_token_validated Event**: Published when AUTH-TOKEN validation occurs
+    - Fields: store_id, session_id, action, status, timestamp, auth_token_id, client_ip, user_agent, location, path, query, user_id
+    - Status: "pass" (valid token) or "fail" (invalid token)
+    - Published from: `AuthenticationMiddleware.cs:66-76` (pass), `AuthenticationMiddleware.cs:84-94` (fail)
+  - **Context Extraction**: Extract once, reuse for both success/failure paths
+  - **Session ID Handling**: SESSION-ID header or auto-generate Guid
+  - **Client IP Priority**: CLIENT_IP header → RemoteIpAddress → "unknown"
+
+#### Changed
+
+- **✅ IRedisPublisher Interface** (`services/naglfar-validation/src/NaglfartAnalytics/Services/IRedisPublisher.cs`):
+  - **Updated PublishETokenEventAsync**: Added path and query parameters (separate from location)
+  - **New PublishAuthTokenValidatedEventAsync**: Complete method for auth validation events
+  - **Parameter Alignment**: All parameters match event.yaml specification exactly
+
+- **✅ RedisPublisher Implementation** (`services/naglfar-validation/src/NaglfartAnalytics/Services/RedisPublisher.cs`):
+  - **Updated e_token_created Publishing**: Includes all required fields from spec
+  - **New auth_token_validated Publishing**: Complete implementation with status handling
+  - **JSON Serialization**: Event messages match event.yaml structure exactly
+  - **Error Handling**: Events wrapped in try-catch, failures logged but don't block requests
+  - **Channel Configuration**: Reads from appsettings, defaults to "naglfar-events"
+
+- **✅ AuthenticationMiddleware** (`services/naglfar-validation/src/NaglfartAnalytics/AuthenticationMiddleware.cs`):
+  - **Context Extraction**: Extract clientIp, userAgent, location, path, query, sessionId once per request
+  - **Event Publishing on Success**: Publishes auth_token_validated with status="pass" and user_id
+  - **Event Publishing on Failure**: Publishes auth_token_validated with status="fail" and user_id=null
+  - **E-TOKEN Event Publishing**: Publishes e_token_created with complete context
+  - **Field Separation**: location (full path+query), path (path only), query (query only)
+
+#### Technical Details
+
+**Event Publishing Flow in naglfar-validation**:
+1. Request arrives → Extract store_id from path
+2. Check for AUTH-TOKEN header
+3. If present:
+   - Extract context: sessionId, clientIp, userAgent, location, path, query
+   - Validate AUTH-TOKEN signature using HMAC SHA256
+   - On success: Publish auth_token_validated with status="pass", user_id from token
+   - On failure: Publish auth_token_validated with status="fail", user_id=null
+4. If not present or invalid:
+   - Generate new E-TOKEN (base64 JSON with expiry, store_id)
+   - Publish e_token_created with token details
+   - Redirect to auth-service with return_url and e_token
+
+**Graph Database Design Principles**:
+- **Connected Objects**: Entities with relationships, not raw event storage
+- **O(1) Lookups**: Graph traversal for fast relationship queries
+- **Pattern Detection**: Natural expression of abuse patterns through path queries
+- **Real-time Updates**: Entity properties updated incrementally (failed_auth_count, is_blocked)
+- **Audit Trail**: Raw events preserved in Event nodes
+- **Multi-hop Queries**: Complex patterns like "IP → Session → User → Store"
+
+**Event Categories in Graph Model**:
+```
+auth          → e_token_created, auth_token_validated, user_register, user_login
+commerce      → add_to_cart, remove_from_cart, view_cart, checkout, view_order, view_orders
+navigation    → view_books, search_books, view_book_detail, check_inventory, list_stores, page_view
+```
+
+#### Files Modified
+
+**naglfar-validation Service**:
+- `src/NaglfartAnalytics/Services/IRedisPublisher.cs` - Updated interface with new methods
+- `src/NaglfartAnalytics/Services/RedisPublisher.cs` - Implemented event publishing per spec
+- `src/NaglfartAnalytics/AuthenticationMiddleware.cs` - Added event publishing on token validation
+
+**Documentation**:
+- `docs/graph-db-data-model.md` (NEW) - Complete graph database design document
+- `services/graph-model.yml` (NEW) - YAML specification for graph database schema
+
+#### Metrics
+
+- **Graph Entities**: 6 entity types defined
+- **Relationships**: 11 relationship types defined
+- **Abuse Patterns**: 8 detection queries pre-configured
+- **Event Categories**: 3 categories (auth, commerce, navigation)
+- **Indexed Properties**: 10+ unique constraints and indexes
+- **Documentation**: 600+ lines of comprehensive design documentation
+
+#### Build Status
+
+- ✅ All builds succeeded
+- ⚠️ 1 warning (unreachable code in AuthenticationMiddleware after return statement)
+
+---
+
 ### 2025-12-28 (Part 4) - Event Publishing Infrastructure & Event Specification
 
 #### Added
