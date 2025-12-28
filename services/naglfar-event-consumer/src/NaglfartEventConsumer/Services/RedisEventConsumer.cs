@@ -1,6 +1,7 @@
 using StackExchange.Redis;
 using System.Text.Json;
 using NaglfartEventConsumer.Models;
+using NaglfartEventConsumer.Metrics;
 
 namespace NaglfartEventConsumer.Services;
 
@@ -43,6 +44,9 @@ public class RedisEventConsumer : BackgroundService
                     _redis = await ConnectionMultiplexer.ConnectAsync(redisConnectionString);
                     _subscriber = _redis.GetSubscriber();
                     _logger.LogInformation("Successfully connected to Redis");
+
+                    // Update connection status metric
+                    EventMetrics.RedisConnectionStatus.Set(1);
                 }
 
                 // Subscribe to channel
@@ -75,6 +79,9 @@ public class RedisEventConsumer : BackgroundService
                     await _redis.DisposeAsync();
                     _redis = null;
                     _subscriber = null;
+
+                    // Update connection status metric
+                    EventMetrics.RedisConnectionStatus.Set(0);
                 }
 
                 // Wait before retry
@@ -116,11 +123,21 @@ public class RedisEventConsumer : BackgroundService
             // TODO: Add business logic here (e.g., store in Neo4j, trigger analytics, etc.)
             await Task.CompletedTask;
 
+            // Record metrics
+            EventMetrics.EventsProcessed
+                .WithLabels(action ?? "unknown", storeId ?? "unknown")
+                .Inc();
+
             _logger.LogInformation("Successfully processed event: Action={Action}", action);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing message: {Message}", message);
+
+            // Record error metric
+            EventMetrics.EventProcessingErrors
+                .WithLabels("unknown", ex.GetType().Name)
+                .Inc();
         }
     }
 

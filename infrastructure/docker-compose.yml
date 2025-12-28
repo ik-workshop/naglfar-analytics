@@ -33,7 +33,12 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8000
       - SIGNATURE_KEY="0064283c-e357-11f0-b060-6e04387dcc74"
+      # Redis Configuration
       - Redis__ConnectionString=redis:6379
+      # Logging Configuration
+      - Logging__LogLevel__Default=Information
+      - Logging__LogLevel__NaglfartAnalytics=Error
+      - Logging__LogLevel__Microsoft.AspNetCore=Error
     restart: unless-stopped
     networks:
     - naglfar-network
@@ -90,16 +95,26 @@ services:
       context: ../services/naglfar-event-consumer
       dockerfile: Dockerfile
     container_name: naglfar-event-consumer
+    ports:
+      - "8083:8080"
     environment:
       - DOTNET_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      # Redis Configuration
       - Redis__ConnectionString=redis:6379
       - Redis__Channel=naglfar-events
       - Redis__RetryDelaySeconds=5
+      # Logging Configuration
+      - Logging__LogLevel__Default=Information
+      - Logging__LogLevel__NaglfartEventConsumer=Error
+      - Logging__LogLevel__Microsoft.Hosting.Lifetime=Error
     restart: unless-stopped
     networks:
       - naglfar-network
     depends_on:
       - redis
+    labels:
+      - "traefik.enable=false"
 
   redis:
     image: "redis:8"

@@ -58,10 +58,21 @@ Configuration is managed through `appsettings.json` and environment variables:
 
 Override configuration using environment variables with `__` (double underscore) as the delimiter:
 
+**Redis Configuration**:
 - `Redis__ConnectionString` - Redis connection string (default: `localhost:6379`)
 - `Redis__Channel` - Redis pub/sub channel (default: `naglfar-events`)
 - `Redis__RetryDelaySeconds` - Retry delay on connection failure (default: `5`)
+
+**Logging Configuration**:
+- `Logging__LogLevel__Default` - Default log level (default: `Information`)
+- `Logging__LogLevel__NaglfartEventConsumer` - Service-specific log level (default: `Information` in Production, `Debug` in Development)
+- `Logging__LogLevel__Microsoft.Hosting.Lifetime` - Host lifetime log level (default: `Information`)
+
+**Available Log Levels**: `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical`, `None`
+
+**Environment**:
 - `DOTNET_ENVIRONMENT` - Environment name (Development/Production)
+- `ASPNETCORE_URLS` - HTTP endpoints (default: `http://+:8080`)
 
 ## Local Development
 
@@ -141,6 +152,150 @@ docker-compose logs -f naglfar-event-consumer
 make compose-rebuild-event-consumer
 ```
 
+## Prometheus Metrics
+
+The service exposes Prometheus metrics at `http://localhost:8083/metrics` for monitoring event processing.
+
+### Metrics Endpoint
+
+- **URL**: `http://localhost:8083/metrics`
+- **Port**: 8083 (mapped from container port 8080)
+- **Format**: Prometheus text format
+
+### Available Metrics
+
+#### 1. Events Processed Counter
+
+**Metric Name**: `naglfar_events_processed_total`
+
+**Type**: Counter
+
+**Description**: Total number of events processed from Redis pub/sub
+
+**Labels**:
+- `action` - Type of event (e.g., "e-token", "auth-token")
+- `store_id` - Store identifier (e.g., "store-1", "store-2", ...)
+
+**Example**:
+```
+# HELP naglfar_events_processed_total Total number of events processed from Redis pub/sub
+# TYPE naglfar_events_processed_total counter
+naglfar_events_processed_total{action="e-token",store_id="store-1"} 42
+naglfar_events_processed_total{action="e-token",store_id="store-2"} 15
+naglfar_events_processed_total{action="auth-token",store_id="store-1"} 8
+```
+
+**Use Cases**:
+- Track total events processed by type
+- Monitor event volume per store
+- Alert on unusual event patterns
+- Calculate event processing rate
+
+#### 2. Event Processing Errors Counter
+
+**Metric Name**: `naglfar_events_processing_errors_total`
+
+**Type**: Counter
+
+**Description**: Total number of events that failed to process
+
+**Labels**:
+- `action` - Type of event that failed
+- `error_type` - Exception type (e.g., "JsonException", "TimeoutException")
+
+**Example**:
+```
+# HELP naglfar_events_processing_errors_total Total number of events that failed to process
+# TYPE naglfar_events_processing_errors_total counter
+naglfar_events_processing_errors_total{action="unknown",error_type="JsonException"} 2
+```
+
+**Use Cases**:
+- Monitor error rates
+- Alert on processing failures
+- Identify problematic event types
+- Track error types for debugging
+
+#### 3. Redis Connection Status Gauge
+
+**Metric Name**: `naglfar_redis_connection_status`
+
+**Type**: Gauge
+
+**Description**: Status of Redis connection (1 = connected, 0 = disconnected)
+
+**Example**:
+```
+# HELP naglfar_redis_connection_status Status of Redis connection (1 = connected, 0 = disconnected)
+# TYPE naglfar_redis_connection_status gauge
+naglfar_redis_connection_status 1
+```
+
+**Use Cases**:
+- Monitor Redis connectivity
+- Alert on connection failures
+- Track connection stability
+- Correlate with event processing issues
+
+### Prometheus Configuration
+
+Add the following to your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: 'naglfar-event-consumer'
+    static_configs:
+      - targets: ['naglfar-event-consumer:8080']
+    # Or if running locally:
+    # - targets: ['localhost:8083']
+    scrape_interval: 15s
+    scrape_timeout: 10s
+```
+
+### Example Queries
+
+**Total events processed**:
+```promql
+sum(naglfar_events_processed_total)
+```
+
+**Events per action type**:
+```promql
+sum by (action) (naglfar_events_processed_total)
+```
+
+**Events per store**:
+```promql
+sum by (store_id) (naglfar_events_processed_total)
+```
+
+**Event processing rate (events/sec)**:
+```promql
+rate(naglfar_events_processed_total[5m])
+```
+
+**Error rate percentage**:
+```promql
+sum(rate(naglfar_events_processing_errors_total[5m]))
+/
+sum(rate(naglfar_events_processed_total[5m])) * 100
+```
+
+**Redis connection uptime**:
+```promql
+avg_over_time(naglfar_redis_connection_status[1h])
+```
+
+### Grafana Dashboard
+
+Import these panels into Grafana:
+
+1. **Event Processing Rate** - Graph showing `rate(naglfar_events_processed_total[5m])`
+2. **Events by Action** - Pie chart of `sum by (action) (naglfar_events_processed_total)`
+3. **Events by Store** - Bar chart of `sum by (store_id) (naglfar_events_processed_total)`
+4. **Error Rate** - Graph showing error percentage over time
+5. **Redis Connection Status** - Single stat showing connection status
+
 ## Architecture
 
 ### Components
@@ -201,9 +356,38 @@ make compose-rebuild-event-consumer
 
 ## Logging
 
-The service uses structured logging with different levels:
+The service uses structured logging with different levels that can be configured via environment variables.
 
-**Production** (appsettings.json):
+### Configuration
+
+**From docker-compose.yml** (Recommended):
+
+Edit `infrastructure/docker-compose.yml` to change logging levels:
+
+```yaml
+naglfar-event-consumer:
+  environment:
+    # Set to Debug for verbose logging
+    - Logging__LogLevel__Default=Debug
+    - Logging__LogLevel__NaglfartEventConsumer=Debug
+
+    # Or set to Warning for minimal logging
+    # - Logging__LogLevel__Default=Warning
+    # - Logging__LogLevel__NaglfartEventConsumer=Warning
+```
+
+**Available Log Levels** (from most to least verbose):
+- `Trace` - Very detailed logs, may include sensitive data
+- `Debug` - Detailed flow and diagnostic information
+- `Information` - General informational messages (default)
+- `Warning` - Abnormal or unexpected events
+- `Error` - Errors and exceptions
+- `Critical` - Critical failures
+- `None` - Disable logging
+
+**Default Configuration**:
+
+Production (appsettings.json):
 ```json
 {
   "Logging": {
@@ -215,7 +399,7 @@ The service uses structured logging with different levels:
 }
 ```
 
-**Development** (appsettings.Development.json):
+Development (appsettings.Development.json):
 ```json
 {
   "Logging": {
@@ -226,6 +410,8 @@ The service uses structured logging with different levels:
   }
 }
 ```
+
+**Note**: Environment variables in docker-compose.yml override appsettings.json values.
 
 ### Log Examples
 

@@ -91,7 +91,140 @@ A multi-service authentication and analytics platform providing **event-driven a
 
 ## Changelog
 
-### 2025-12-28 - Redis Event Consumer Service Implementation
+### 2025-12-28 (Part 2) - Prometheus Metrics & Configurable Logging
+
+#### Added
+
+- **✅ Prometheus Metrics for Event Consumer** (`services/naglfar-event-consumer/`):
+  - **Package**: prometheus-net.AspNetCore 8.2.1
+  - **Metrics Endpoint**: `http://localhost:8083/metrics`
+  - **Health Endpoints**: `/healthz` and `/readyz` on port 8080
+  - **Changed SDK**: From `Microsoft.NET.Sdk.Worker` to `Microsoft.NET.Sdk.Web` for HTTP endpoint support
+  - **Changed Runtime**: From `dotnet/runtime` to `dotnet/aspnet` Alpine image
+
+- **✅ Event Processing Metrics** (`Metrics/EventMetrics.cs`):
+  - **`naglfar_events_processed_total`** (Counter):
+    - Labels: `action` (e.g., "e-token"), `store_id` (e.g., "store-1")
+    - Tracks total events processed by type and store
+  - **`naglfar_events_processing_errors_total`** (Counter):
+    - Labels: `action`, `error_type` (exception type)
+    - Tracks processing failures
+  - **`naglfar_redis_connection_status`** (Gauge):
+    - Value: 1 = connected, 0 = disconnected
+    - Monitors Redis connection health
+
+- **✅ Metric Recording in RedisEventConsumer**:
+  - Increments `naglfar_events_processed_total` for each successfully processed event
+  - Increments `naglfar_events_processing_errors_total` on processing failures
+  - Updates `naglfar_redis_connection_status` on connect/disconnect
+
+- **✅ Configurable Logging via docker-compose.yml**:
+  - **naglfar-event-consumer**:
+    - `Logging__LogLevel__Default=Information`
+    - `Logging__LogLevel__NaglfartEventConsumer=Debug`
+    - `Logging__LogLevel__Microsoft.Hosting.Lifetime=Information`
+  - **naglfar-validation**:
+    - `Logging__LogLevel__Default=Information`
+    - `Logging__LogLevel__NaglfartAnalytics=Debug`
+    - `Logging__LogLevel__Microsoft.AspNetCore=Debug`
+  - Allows changing log levels without code changes or rebuilding images
+
+#### Modified
+
+- **`infrastructure/docker-compose.yml`**:
+  - Added port mapping `8083:8080` for naglfar-event-consumer metrics endpoint
+  - Added `ASPNETCORE_URLS=http://+:8080` environment variable
+  - Added logging configuration environment variables for both services
+  - Added comments for Redis and Logging configuration sections
+
+- **`services/naglfar-event-consumer/src/NaglfartEventConsumer/Program.cs`**:
+  - Changed from `Host.CreateApplicationBuilder` to `WebApplication.CreateBuilder`
+  - Configured Kestrel to listen on port 8080
+  - Added `app.MapMetrics()` for Prometheus endpoint
+  - Added `app.MapHealthChecks("/healthz")` and `/readyz` endpoints
+
+- **`services/naglfar-event-consumer/src/NaglfartEventConsumer/NaglfartEventConsumer.csproj`**:
+  - Changed SDK from `Microsoft.NET.Sdk.Worker` to `Microsoft.NET.Sdk.Web`
+  - Added `prometheus-net.AspNetCore` package
+  - Removed redundant `Microsoft.Extensions.Hosting` and `Microsoft.Extensions.Diagnostics.HealthChecks` (included in Web SDK)
+
+- **`services/naglfar-event-consumer/Dockerfile`**:
+  - Changed base image from `mcr.microsoft.com/dotnet/runtime:10.0-alpine` to `mcr.microsoft.com/dotnet/aspnet:10.0-alpine`
+  - Added `EXPOSE 8080` directive
+
+#### Documentation
+
+- **`services/naglfar-event-consumer/README.md`**:
+  - Added comprehensive **Prometheus Metrics** section:
+    - Metrics endpoint details
+    - All 3 metrics with descriptions, labels, and examples
+    - Prometheus configuration (prometheus.yml snippet)
+    - Example PromQL queries (total events, rate, error percentage, etc.)
+    - Grafana dashboard suggestions
+  - Enhanced **Logging** section:
+    - How to configure from docker-compose.yml
+    - All available log levels with descriptions
+    - Examples for different scenarios (debug, warning, etc.)
+    - Note about environment variable precedence
+
+- **`services/naglfar-validation/README.md`**:
+  - Added **Logging** subsection to Configuration:
+    - How to configure logging via docker-compose.yml
+    - All available log levels
+  - Enhanced **Environment Variables** section:
+    - Organized by category (General, Authentication, Redis, Logging)
+    - Added logging configuration examples
+
+#### Technical Details
+
+**Metrics Implementation**:
+```csharp
+// On successful event processing
+EventMetrics.EventsProcessed
+    .WithLabels(action ?? "unknown", storeId ?? "unknown")
+    .Inc();
+
+// On Redis connection
+EventMetrics.RedisConnectionStatus.Set(1);
+
+// On processing error
+EventMetrics.EventProcessingErrors
+    .WithLabels("unknown", ex.GetType().Name)
+    .Inc();
+```
+
+**Example Metric Output**:
+```
+# HELP naglfar_events_processed_total Total number of events processed from Redis pub/sub
+# TYPE naglfar_events_processed_total counter
+naglfar_events_processed_total{action="e-token",store_id="store-1"} 42
+naglfar_events_processed_total{action="e-token",store_id="store-2"} 15
+
+# HELP naglfar_redis_connection_status Status of Redis connection (1 = connected, 0 = disconnected)
+# TYPE naglfar_redis_connection_status gauge
+naglfar_redis_connection_status 1
+```
+
+**Logging Configuration Override**:
+- Environment variables in `docker-compose.yml` override `appsettings.json`
+- Format: `Logging__LogLevel__<Category>=<Level>`
+- No rebuild required - just restart container
+
+#### Files Modified
+- `infrastructure/docker-compose.yml` - Added metrics port and logging configuration
+- `services/naglfar-event-consumer/src/NaglfartEventConsumer/Program.cs` - Added web hosting and metrics
+- `services/naglfar-event-consumer/src/NaglfartEventConsumer/NaglfartEventConsumer.csproj` - Changed to Web SDK
+- `services/naglfar-event-consumer/src/NaglfartEventConsumer/Services/RedisEventConsumer.cs` - Added metric recording
+- `services/naglfar-event-consumer/Dockerfile` - Changed to aspnet runtime
+- `services/naglfar-event-consumer/README.md` - Added metrics and logging documentation
+- `services/naglfar-validation/README.md` - Added logging configuration documentation
+
+#### Files Added
+- `services/naglfar-event-consumer/src/NaglfartEventConsumer/Metrics/EventMetrics.cs` - Prometheus metrics definitions
+
+---
+
+### 2025-12-28 (Part 1) - Redis Event Consumer Service Implementation
 
 #### Added
 - **✅ Naglfar Event Consumer Service** (`services/naglfar-event-consumer/`):

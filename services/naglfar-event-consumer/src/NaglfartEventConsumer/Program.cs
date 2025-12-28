@@ -1,7 +1,14 @@
 using NaglfartEventConsumer.Services;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Prometheus;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
+
+// Configure Kestrel to listen on port 8080 for metrics
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(8080); // Metrics endpoint
+});
 
 // Add health checks
 builder.Services.AddHealthChecks()
@@ -10,5 +17,13 @@ builder.Services.AddHealthChecks()
 // Register the Redis Event Consumer background service
 builder.Services.AddHostedService<RedisEventConsumer>();
 
-var host = builder.Build();
-host.Run();
+var app = builder.Build();
+
+// Expose Prometheus metrics endpoint at /metrics
+app.MapMetrics();
+
+// Health check endpoints
+app.MapHealthChecks("/healthz");
+app.MapHealthChecks("/readyz");
+
+app.Run();

@@ -21,10 +21,11 @@ RUN dotnet publish "NaglfartEventConsumer.csproj" \
     /p:PublishSingleFile=false \
     /p:EnableCompressionInSingleFile=false
 
-# Runtime stage (using runtime, not aspnet, since this is a worker service)
-FROM mcr.microsoft.com/dotnet/runtime:10.0-alpine AS runtime
+# Runtime stage (using aspnet for web endpoints)
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 
 WORKDIR /app
+EXPOSE 8080
 
 COPY --from=publish /app/publish .
 

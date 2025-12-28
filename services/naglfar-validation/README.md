@@ -495,13 +495,63 @@ Configuration files are located in `src/NaglfartAnalytics/`:
 }
 ```
 
-Environment variables can override any setting using the format:
+**Logging:**
+
+Configure logging levels via environment variables in `docker-compose.yml`:
+
+```yaml
+naglfar-validation:
+  environment:
+    # Set to Debug for verbose logging
+    - Logging__LogLevel__Default=Debug
+    - Logging__LogLevel__NaglfartAnalytics=Debug
+
+    # Or set to Warning for minimal logging
+    # - Logging__LogLevel__Default=Warning
+    # - Logging__LogLevel__NaglfartAnalytics=Warning
+```
+
+**Available Log Levels** (from most to least verbose):
+- `Trace` - Very detailed logs, may include sensitive data
+- `Debug` - Detailed flow and diagnostic information
+- `Information` - General informational messages (default)
+- `Warning` - Abnormal or unexpected events
+- `Error` - Errors and exceptions
+- `Critical` - Critical failures
+- `None` - Disable logging
+
+### Environment Variables
+
+Override configuration using environment variables with `__` (double underscore) as the delimiter:
+
+**General Configuration:**
 ```bash
 ASPNETCORE_ENVIRONMENT=Production
 ASPNETCORE_URLS=http://+:8000
-Authentication__CookieName=custom-auth-cookie
-Authentication__AuthServiceUrl=https://auth.example.com
 ```
+
+**Authentication:**
+```bash
+Authentication__HeaderName=AUTH-TOKEN
+Authentication__ETokenHeaderName=E-TOKEN
+Authentication__AuthServiceUrl=https://auth.example.com
+SIGNATURE_KEY=your-secret-key-here
+```
+
+**Redis:**
+```bash
+Redis__ConnectionString=redis:6379
+Redis__Channel=naglfar-events
+```
+
+**Logging:**
+```bash
+Logging__LogLevel__Default=Information
+Logging__LogLevel__NaglfartAnalytics=Debug
+Logging__LogLevel__Microsoft.AspNetCore=Warning
+```
+
+**Note**: Environment variables in docker-compose.yml override appsettings.json values.
 
 ## Project Structure
 
