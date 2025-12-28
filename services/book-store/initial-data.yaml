@@ -1,0 +1,92 @@
+# Initial data for Book Store service
+# This file is loaded on startup to seed the in-memory database
+
+stores:
+  store-1: "London"
+  store-2: "Paris"
+  store-3: "Berlin"
+  store-4: "Madrid"
+  store-5: "Rome"
+  store-6: "Amsterdam"
+  store-7: "Vienna"
+  store-8: "Brussels"
+  store-9: "Copenhagen"
+  store-10: "Stockholm"
+
+books:
+  - title: "Clean Code"
+    author: "Robert C. Martin"
+    price: 45.00
+    description: "A Handbook of Agile Software Craftsmanship"
+    category: "programming"
+    stock_count: 12
+
+  - title: "Design Patterns"
+    author: "Gang of Four"
+    price: 52.00
+    description: "Elements of Reusable Object-Oriented Software"
+    category: "programming"
+    stock_count: 5
+
+  - title: "Refactoring"
+    author: "Martin Fowler"
+    price: 48.00
+    description: "Improving the Design of Existing Code"
+    category: "programming"
+    stock_count: 8
+
+  - title: "Code Complete"
+    author: "Steve McConnell"
+    price: 55.00
+    description: "A Practical Handbook of Software Construction"
+    category: "programming"
+    stock_count: 15
+
+  - title: "The Pragmatic Programmer"
+    author: "Andrew Hunt & David Thomas"
+    price: 43.00
+    description: "Your Journey to Mastery"
+    category: "programming"
+    stock_count: 8
+
+  - title: "Introduction to Algorithms"
+    author: "CLRS"
+    price: 85.00
+    description: "Third Edition"
+    category: "algorithms"
+    stock_count: 20
+
+  - title: "Cracking the Coding Interview"
+    author: "Gayle Laakmann McDowell"
+    price: 35.00
+    description: "189 Programming Questions and Solutions"
+    category: "interview"
+    stock_count: 25
+
+  - title: "System Design Interview"
+    author: "Alex Xu"
+    price: 42.00
+    description: "An Insider's Guide"
+    category: "interview"
+    stock_count: 18
+
+  - title: "Designing Data-Intensive Applications"
+    author: "Martin Kleppmann"
+    price: 58.00
+    description: "The Big Ideas Behind Reliable, Scalable Systems"
+    category: "distributed-systems"
+    stock_count: 10
+
+  - title: "The DevOps Handbook"
+    author: "Gene Kim et al."
+    price: 38.00
+    description: "How to Create World-Class Agility, Reliability"
+    category: "devops"
+    stock_count: 14
+
+  - title: "Limited Edition: Site Reliability Engineering"
+    author: "Google"
+    price: 75.00
+    description: "How Google Runs Production Systems - Limited Edition"
+    category: "devops"
+    stock_count: 10

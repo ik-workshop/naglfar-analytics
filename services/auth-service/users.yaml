@@ -1,0 +1,203 @@
+# User accounts for Book Store service
+# All users have the default password: password123
+
+users:
+  - id: 1
+    email: "alice.anderson@example.com"
+    password: "password123"
+
+  - id: 2
+    email: "bob.brown@example.com"
+    password: "password123"
+
+  - id: 3
+    email: "carol.clark@example.com"
+    password: "password123"
+
+  - id: 4
+    email: "david.davis@example.com"
+    password: "password123"
+
+  - id: 5
+    email: "emily.evans@example.com"
+    password: "password123"
+
+  - id: 6
+    email: "frank.foster@example.com"
+    password: "password123"
+
+  - id: 7
+    email: "grace.garcia@example.com"
+    password: "password123"
+
+  - id: 8
+    email: "henry.harris@example.com"
+    password: "password123"
+
+  - id: 9
+    email: "iris.ivanov@example.com"
+    password: "password123"
+
+  - id: 10
+    email: "jack.jackson@example.com"
+    password: "password123"
+
+  - id: 11
+    email: "kate.kelly@example.com"
+    password: "password123"
+
+  - id: 12
+    email: "liam.lewis@example.com"
+    password: "password123"
+
+  - id: 13
+    email: "maria.martinez@example.com"
+    password: "password123"
+
+  - id: 14
+    email: "noah.nelson@example.com"
+    password: "password123"
+
+  - id: 15
+    email: "olivia.owens@example.com"
+    password: "password123"
+
+  - id: 16
+    email: "peter.parker@example.com"
+    password: "password123"
+
+  - id: 17
+    email: "quinn.quinn@example.com"
+    password: "password123"
+
+  - id: 18
+    email: "rachel.roberts@example.com"
+    password: "password123"
+
+  - id: 19
+    email: "sam.smith@example.com"
+    password: "password123"
+
+  - id: 20
+    email: "tina.taylor@example.com"
+    password: "password123"
+
+  - id: 21
+    email: "uma.underwood@example.com"
+    password: "password123"
+
+  - id: 22
+    email: "victor.vernon@example.com"
+    password: "password123"
+
+  - id: 23
+    email: "wendy.wilson@example.com"
+    password: "password123"
+
+  - id: 24
+    email: "xavier.xu@example.com"
+    password: "password123"
+
+  - id: 25
+    email: "yara.young@example.com"
+    password: "password123"
+
+  - id: 26
+    email: "zack.zhang@example.com"
+    password: "password123"
+
+  - id: 27
+    email: "adam.adams@example.com"
+    password: "password123"
+
+  - id: 28
+    email: "bella.baker@example.com"
+    password: "password123"
+
+  - id: 29
+    email: "charlie.chen@example.com"
+    password: "password123"
+
+  - id: 30
+    email: "diana.diaz@example.com"
+    password: "password123"
+
+  - id: 31
+    email: "ethan.edwards@example.com"
+    password: "password123"
+
+  - id: 32
+    email: "fiona.fisher@example.com"
+    password: "password123"
+
+  - id: 33
+    email: "george.green@example.com"
+    password: "password123"
+
+  - id: 34
+    email: "hannah.hall@example.com"
+    password: "password123"
+
+  - id: 35
+    email: "ian.ingram@example.com"
+    password: "password123"
+
+  - id: 36
+    email: "julia.jones@example.com"
+    password: "password123"
+
+  - id: 37
+    email: "kevin.kim@example.com"
+    password: "password123"
+
+  - id: 38
+    email: "laura.lee@example.com"
+    password: "password123"
+
+  - id: 39
+    email: "michael.moore@example.com"
+    password: "password123"
+
+  - id: 40
+    email: "nina.nguyen@example.com"
+    password: "password123"
+
+  - id: 41
+    email: "oscar.ortiz@example.com"
+    password: "password123"
+
+  - id: 42
+    email: "paula.peterson@example.com"
+    password: "password123"
+
+  - id: 43
+    email: "quincy.quinn@example.com"
+    password: "password123"
+
+  - id: 44
+    email: "ryan.rodriguez@example.com"
+    password: "password123"
+
+  - id: 45
+    email: "sophia.sullivan@example.com"
+    password: "password123"
+
+  - id: 46
+    email: "thomas.thompson@example.com"
+    password: "password123"
+
+  - id: 47
+    email: "ursula.upton@example.com"
+    password: "password123"
+
+  - id: 48
+    email: "vincent.valdez@example.com"
+    password: "password123"
+
+  - id: 49
+    email: "willow.white@example.com"
+    password: "password123"
+
+  - id: 50
+    email: "xander.xiong@example.com"
+    password: "password123"

@@ -1,0 +1,660 @@
+# API Routes Documentation
+# Note: This section is for documentation purposes and future use
+# Routes are not loaded into the database yet
+
+# Header Requirements:
+# - All endpoints (except health checks) require: AUTH_TOKEN, AUTH_TOKEN_ID
+# - All endpoints support optional: SESSION_ID (auto-generated if not provided)
+
+# Event Specifications:
+# - All endpoints (except health checks) publish events to Redis
+# - Events follow the BookStoreEvent schema from message/events.py
+
+routes:
+  # General / System Routes
+  general:
+    - method: GET
+      path: "/"
+      description: "Root endpoint - service information and status"
+      auth_required: false
+      tags: ["general"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: optional
+          description: "Not applicable for root endpoint"
+        action:
+          status: required
+          description: "N/A - general info request (no specific action constant)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: optional
+          description: "Not authenticated - will be null"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+
+    - method: GET
+      path: "/healthz"
+      description: "Health check endpoint for Kubernetes liveness probe"
+      auth_required: false
+      tags: ["health"]
+      headers: {}
+      notes: "No authentication required - health check endpoint. No events published."
+
+    - method: GET
+      path: "/readyz"
+      description: "Readiness check endpoint for Kubernetes readiness probe"
+      auth_required: false
+      tags: ["health"]
+      headers: {}
+      notes: "No authentication required - health check endpoint. No events published."
+
+    - method: GET
+      path: "/api/v1/stores"
+      description: "List all available store locations"
+      auth_required: false
+      tags: ["stores"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: optional
+          description: "Not applicable - listing all stores"
+        action:
+          status: required
+          description: "list_stores (ActionType.LIST_STORES from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: optional
+          description: "Not authenticated - will be null"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+      response: "List of stores with IDs, locations, and API base URLs"
+
+  # Books Routes
+  books:
+    - method: GET
+      path: "/api/v1/{store_id}/books"
+      description: "List all books with optional filtering by category or search term"
+      auth_required: false
+      tags: ["books"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "view_books or search_books (ActionType.VIEW_BOOKS or ActionType.SEARCH_BOOKS if search param present)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: optional
+          description: "Not authenticated - will be null"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+        data:
+          status: optional
+          description: "Additional data: category, search term if provided"
+      path_params:
+        - name: store_id
+          description: "Store identifier (e.g., store-1, store-2)"
+      query_params:
+        - name: category
+          description: "Filter by book category (programming, algorithms, etc.)"
+          required: false
+        - name: search
+          description: "Search term for title or author"
+          required: false
+
+    - method: GET
+      path: "/api/v1/{store_id}/books/{book_id}"
+      description: "Get details for a specific book"
+      auth_required: false
+      tags: ["books"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "view_book_detail (ActionType.VIEW_BOOK_DETAIL from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: optional
+          description: "Not authenticated - will be null"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+        data:
+          status: optional
+          description: "Additional data: book_id from path parameter"
+      path_params:
+        - name: store_id
+          description: "Store identifier"
+        - name: book_id
+          description: "The ID of the book to retrieve"
+
+  # Authentication Routes
+  authentication:
+    - method: POST
+      path: "/api/v1/{store_id}/auth/register"
+      description: "Register a new user account"
+      auth_required: false
+      tags: ["authentication"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "user_register (ActionType.USER_REGISTER from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From newly created user account"
+        auth_token_id:
+          status: required
+          description: "From newly generated auth token returned in response"
+        data:
+          status: optional
+          description: "Additional data: email from request body"
+      path_params:
+        - name: store_id
+          description: "Store identifier"
+      body_params:
+        - name: email
+          description: "Valid email address"
+        - name: password
+          description: "Password (minimum 6 characters)"
+      response: "Access token and user ID"
+
+    - method: POST
+      path: "/api/v1/{store_id}/auth/login"
+      description: "Login with email and password"
+      auth_required: false
+      tags: ["authentication"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "user_login (ActionType.USER_LOGIN from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From authenticated user account"
+        auth_token_id:
+          status: required
+          description: "From newly generated auth token returned in response"
+        data:
+          status: optional
+          description: "Additional data: email from request body"
+      path_params:
+        - name: store_id
+          description: "Store identifier"
+      body_params:
+        - name: email
+          description: "User's email address"
+        - name: password
+          description: "User's password"
+      response: "Access token and user ID"
+
+  # Shopping Cart Routes
+  cart:
+    - method: GET
+      path: "/api/v1/{store_id}/cart"
+      description: "View current user's shopping cart with items, prices, tax, and total"
+      auth_required: true
+      tags: ["cart"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "view_cart (ActionType.VIEW_CART from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From authenticated user (required for cart operations)"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+      path_params:
+        - name: store_id
+          description: "Store identifier"
+      response: "Cart items with subtotal, tax (8%), and total"
+
+    - method: POST
+      path: "/api/v1/{store_id}/cart/items"
+      description: "Add item to shopping cart"
+      auth_required: true
+      tags: ["cart"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "add_to_cart (ActionType.ADD_TO_CART from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From authenticated user (required for cart operations)"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+        data:
+          status: optional
+          description: "Additional data: book_id and quantity from request body"
+      path_params:
+        - name: store_id
+          description: "Store identifier"
+      body_params:
+        - name: book_id
+          description: "ID of the book to add"
+        - name: quantity
+          description: "Number of items (1-10)"
+      response: "Confirmation message and cart item ID"
+
+    - method: DELETE
+      path: "/api/v1/{store_id}/cart/items/{cart_item_id}"
+      description: "Remove item from shopping cart"
+      auth_required: true
+      tags: ["cart"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "remove_from_cart (ActionType.REMOVE_FROM_CART from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From authenticated user (required for cart operations)"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+        data:
+          status: optional
+          description: "Additional data: cart_item_id from URL path parameter"
+      path_params:
+        - name: store_id
+          description: "Store identifier"
+        - name: cart_item_id
+          description: "ID of the cart item to remove"
+
+  # Order / Checkout Routes
+  orders:
+    - method: POST
+      path: "/api/v1/{store_id}/checkout"
+      description: "Process checkout and create an order from cart items"
+      auth_required: true
+      tags: ["orders"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "checkout (ActionType.CHECKOUT from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From authenticated user (required for checkout)"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+        data:
+          status: optional
+          description: "Additional data: order_id, total_amount, payment_method"
+      path_params:
+        - name: store_id
+          description: "Store identifier"
+      body_params:
+        - name: payment_method
+          description: "Payment method identifier (e.g., 'card_ending_1234')"
+      response: "Order details with items, subtotal, tax, total, status, and estimated delivery (5 days)"
+
+    - method: GET
+      path: "/api/v1/{store_id}/orders/{order_id}"
+      description: "Get details for a specific order (must belong to current user)"
+      auth_required: true
+      tags: ["orders"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "view_order (ActionType.VIEW_ORDER from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From authenticated user (required for order viewing)"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+        data:
+          status: optional
+          description: "Additional data: order_id from URL path parameter"
+      path_params:
+        - name: store_id
+          description: "Store identifier"
+        - name: order_id
+          description: "ID of the order to retrieve"
+      response: "Order details with all items and pricing information"
+
+    - method: GET
+      path: "/api/v1/{store_id}/orders"
+      description: "List all orders for the current user"
+      auth_required: true
+      tags: ["orders"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "view_orders (ActionType.VIEW_ORDERS from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From authenticated user (required for order listing)"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+      path_params:
+        - name: store_id
+          description: "Store identifier"
+      response: "List of all user's orders with full details"
+
+  # Inventory Routes
+  inventory:
+    - method: GET
+      path: "/api/v1/{store_id}/inventory"
+      description: "Check inventory levels for all books or a specific book"
+      auth_required: false
+      tags: ["inventory"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From URL path parameter {store_id}"
+        action:
+          status: required
+          description: "check_inventory (ActionType.CHECK_INVENTORY from events.py)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: optional
+          description: "Not authenticated - will be null"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+        data:
+          status: optional
+          description: "Additional data: book_id from query parameter if specified"
+      path_params:
+        - name: store_id
+          description: "Store identifier"
+      query_params:
+        - name: book_id
+          description: "Optional - check specific book, or all books if not provided"
+          required: false
+      response: "Inventory levels with book ID, title, quantity, in_stock status, and last_updated"
+
+  # Admin Routes (Internal Use)
+  admin:
+    - method: GET
+      path: "/internal/admin/stats"
+      description: "Get database statistics (internal use only)"
+      auth_required: false
+      tags: ["admin"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: optional
+          description: "Not applicable - admin endpoint"
+        action:
+          status: required
+          description: "N/A - admin stats (no specific action constant defined)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: optional
+          description: "Not applicable - internal endpoint"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+      response: "Statistics including total books, users, orders, active carts, and tokens"
+      notes: "Internal endpoint - should be protected in production"
+
+    - method: POST
+      path: "/internal/admin/reset"
+      description: "Reset database to initial state (internal use only)"
+      auth_required: false
+      tags: ["admin"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: optional
+          description: "Not applicable - admin endpoint"
+        action:
+          status: required
+          description: "N/A - admin reset (no specific action constant defined)"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: optional
+          description: "Not applicable - internal endpoint"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+      response: "Success message"
+      notes: "Dangerous endpoint - resets all data. Should be protected or removed in production"

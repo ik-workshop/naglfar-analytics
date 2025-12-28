@@ -1,0 +1,216 @@
+# API Routes Documentation - Auth Service
+# Note: This section is for documentation purposes and future use
+# Routes are not loaded into the database yet
+
+# Header Requirements:
+# - All endpoints (except health checks) require: AUTH_TOKEN, AUTH_TOKEN_ID
+# - All endpoints support optional: SESSION_ID (auto-generated if not provided)
+
+# Event Specifications:
+# - All endpoints (except health checks) publish events to Redis
+# - Events follow the BookStoreEvent schema
+
+# Action Types for Auth Service:
+# - e_token_validation: Validate E-TOKEN from naglfar-validation
+# - auth_token_generation: Generate AUTH-TOKEN
+# - user_authorize: Authorize/register new user
+# - user_authenticate: Authenticate existing user
+
+routes:
+  # General / System Routes
+  general:
+    - method: GET
+      path: "/"
+      description: "Root endpoint - service information and status"
+      auth_required: false
+      tags: ["general"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: optional
+          description: "Not applicable for root endpoint"
+        action:
+          status: required
+          description: "N/A - general info request"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: optional
+          description: "Not authenticated - will be null"
+        auth_token_id:
+          status: required
+          description: "From AUTH_TOKEN_ID header"
+
+    - method: GET
+      path: "/healthz"
+      description: "Health check endpoint for Kubernetes liveness probe"
+      auth_required: false
+      tags: ["health"]
+      headers: {}
+      notes: "No authentication required - health check endpoint. No events published."
+
+    - method: GET
+      path: "/readyz"
+      description: "Readiness check endpoint for Kubernetes readiness probe"
+      auth_required: false
+      tags: ["health"]
+      headers: {}
+      notes: "No authentication required - health check endpoint. No events published."
+
+  # Authentication Routes
+  authentication:
+    - method: GET
+      path: "/api/v1/auth/"
+      description: "Authentication landing page - validates E-TOKEN and generates AUTH-TOKEN"
+      auth_required: false
+      tags: ["authentication"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      query_params:
+        - name: e_token
+          description: "Ephemeral token from naglfar-validation (base64-encoded JSON)"
+          required: true
+        - name: return_url
+          description: "URL to redirect after authentication"
+          required: true
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From decoded E-TOKEN (e_token_data.store_id)"
+        action:
+          status: required
+          description: "e_token_validation and auth_token_generation"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From authenticated user (currently auto-uses test user)"
+        auth_token_id:
+          status: required
+          description: "From newly generated AUTH-TOKEN (SHA256 hash)"
+        data:
+          status: optional
+          description: "Additional data: e_token expiry, return_url, store_id"
+      response: "302 Redirect to return_url with AUTH_TOKEN and AUTH_TOKEN_ID headers"
+      notes: "Currently auto-authenticates with test user. TODO: Show login/register form"
+
+    - method: POST
+      path: "/api/v1/auth/authorize"
+      description: "Register/authorize a new user account"
+      auth_required: false
+      tags: ["authentication"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      query_params:
+        - name: store_id
+          description: "Store identifier"
+          required: true
+      body_params:
+        - name: email
+          description: "Valid email address"
+          required: true
+        - name: password
+          description: "Password (minimum 6 characters)"
+          required: true
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From query parameter"
+        action:
+          status: required
+          description: "user_authorize - Register new user and generate AUTH-TOKEN"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From newly created user account"
+        auth_token_id:
+          status: required
+          description: "From newly generated AUTH-TOKEN (SHA256 hash)"
+        data:
+          status: optional
+          description: "Additional data: email from request body"
+      response: "AUTH-TOKEN, AUTH-TOKEN-ID, and user_id"
+
+    - method: POST
+      path: "/api/v1/auth/login"
+      description: "Login with email and password"
+      auth_required: false
+      tags: ["authentication"]
+      headers:
+        required:
+          - name: AUTH_TOKEN
+            description: "Authentication token"
+          - name: AUTH_TOKEN_ID
+            description: "Authentication token identifier"
+        optional:
+          - name: SESSION_ID
+            description: "Session identifier (auto-generated if not provided)"
+      query_params:
+        - name: store_id
+          description: "Store identifier"
+          required: true
+      body_params:
+        - name: email
+          description: "User's email address"
+          required: true
+        - name: password
+          description: "User's password"
+          required: true
+      event:
+        session_id:
+          status: required
+          description: "Session identifier from SESSION_ID header or auto-generated"
+        store_id:
+          status: required
+          description: "From query parameter"
+        action:
+          status: required
+          description: "user_authenticate - Authenticate user and generate AUTH-TOKEN"
+        timestamp:
+          status: required
+          description: "Auto-generated when event is captured"
+        user_id:
+          status: required
+          description: "From authenticated user account"
+        auth_token_id:
+          status: required
+          description: "From newly generated AUTH-TOKEN (SHA256 hash)"
+        data:
+          status: optional
+          description: "Additional data: email from request body"
+      response: "AUTH-TOKEN, AUTH-TOKEN-ID, and user_id"
