@@ -358,6 +358,7 @@ These endpoints are commonly used by:
 - [Redis](https://redis.io/)
 - [Redis mod](https://hub.docker.com/r/redislabs/redismod)
 - [Neo4J Driver](https://neo4j.com/docs/dotnet-manual/current/)
+- [Neo4j examples](https://github.com/neo4j-graph-examples)
 
 ## License
 
