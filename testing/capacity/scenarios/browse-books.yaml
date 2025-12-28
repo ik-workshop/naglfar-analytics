@@ -1,0 +1,103 @@
+name: "Browse Books Capacity Test"
+description: "Capacity test for browsing books from multiple stores"
+baseUrl: "${BASE_URL:-http://localhost}"
+
+# Load injection profile
+injection:
+  - type: rampUsers
+    users: 10
+    duration: 30s
+  - type: constantUsersPerSec
+    rate: 5
+    duration: 2m
+  - type: rampUsers
+    users: 50
+    duration: 30s
+  - type: constantUsersPerSec
+    rate: 10
+    duration: 1m
+  - type: rampUsers
+    users: 0
+    duration: 30s
+
+# Performance thresholds
+thresholds:
+  global:
+    successRate: 95.0  # 95% success rate
+    maxResponseTime: 2000  # 2 seconds max
+  requests:
+    browse:
+      p95: 500  # p95 < 500ms
+      p99: 1000  # p99 < 1000ms
+
+# Test scenarios
+scenarios:
+  - name: "Browse Books from Store"
+    weight: 100  # 100% of users run this scenario
+
+    steps:
+      # Step 1: Browse books (triggers E-TOKEN generation)
+      - name: "Initial Browse Request"
+        http:
+          method: GET
+          path: "/api/books?storeId=store-1"
+          headers:
+            Host: "api.local"
+          checks:
+            - status: 200
+            - jsonPath: "$[0].title"
+            - responseTime:
+                p95: 500
+          saveHeaders:
+            - name: "eToken"
+              header: "E-TOKEN"
+            - name: "eTokenId"
+              header: "E-TOKEN-ID"
+
+      # Step 2: If E-TOKEN received, get AUTH-TOKEN
+      - name: "Get Auth Token"
+        condition: "eToken != null"
+        http:
+          method: GET
+          path: "/auth?eToken=${eToken}&eTokenId=${eTokenId}"
+          headers:
+            Host: "api.local"
+          checks:
+            - status: 200
+          saveHeaders:
+            - name: "authToken"
+              header: "AUTH-TOKEN"
+            - name: "authTokenId"
+              header: "AUTH-TOKEN-ID"
+
+      # Step 3: Browse with authentication
+      - name: "Authenticated Browse"
+        condition: "authToken != null"
+        pause: 1s  # Think time
+        http:
+          method: GET
+          path: "/api/books?storeId=store-1"
+          headers:
+            Host: "api.local"
+            AUTH-TOKEN: "${authToken}"
+            AUTH-TOKEN-ID: "${authTokenId}"
+          checks:
+            - status: 200
+            - jsonPath: "$[*].title"
+            - jsonPath: "$[*].price"
+            - responseTime:
+                p95: 300
+
+      # Step 4: Browse different store
+      - name: "Browse Another Store"
+        pause: 2s  # Think time
+        http:
+          method: GET
+          path: "/api/books?storeId=store-2"
+          headers:
+            Host: "api.local"
+            AUTH-TOKEN: "${authToken}"
+            AUTH-TOKEN-ID: "${authTokenId}"
+          checks:
+            - status: 200
+            - jsonPath: "$[0].storeId"

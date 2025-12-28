@@ -1,0 +1,78 @@
+name: "Browse Books Journey"
+description: "Test browsing books from a store, including E-TOKEN and AUTH-TOKEN flow"
+
+# Test configuration
+config:
+  base_url: "${BASE_URL:-http://localhost}"
+  store_id: "store-1"
+  verbose: false
+
+# Test steps
+steps:
+  # Step 1: Initial request without AUTH-TOKEN
+  - name: "Request books without authentication"
+    request:
+      method: GET
+      path: "/api/v1/{store_id}/books"
+      headers:
+        Host: "api.local"
+    expect:
+      status: 200
+      headers:
+        - name: "E-TOKEN"
+          required: true
+          save_as: "e_token"
+        - name: "E-TOKEN-ID"
+          required: true
+          save_as: "e_token_id"
+    description: "First request should return E-TOKEN for authentication"
+
+  # Step 2: Get AUTH-TOKEN from auth service
+  - name: "Exchange E-TOKEN for AUTH-TOKEN"
+    request:
+      method: GET
+      path: "/api/v1/auth/"
+      params:
+        eToken: "{e_token}"
+        eTokenId: "{e_token_id}"
+        returnUrl: "http://localhost/api/v1/{store_id}/books"
+      headers:
+        Host: "api.local"
+    expect:
+      status: 200
+      headers:
+        - name: "AUTH-TOKEN"
+          required: true
+          save_as: "auth_token"
+        - name: "AUTH-TOKEN-ID"
+          required: true
+          save_as: "auth_token_id"
+    description: "Auth service should validate E-TOKEN and return AUTH-TOKEN"
+
+  # Step 3: Access books with AUTH-TOKEN
+  - name: "Request books with authentication"
+    request:
+      method: GET
+      path: "/api/v1/{store_id}/books"
+      headers:
+        Host: "api.local"
+        AUTH-TOKEN: "{auth_token}"
+        AUTH-TOKEN-ID: "{auth_token_id}"
+    expect:
+      status: 200
+      json:
+        - path: "$[0].title"
+          exists: true
+        - path: "$[0].price"
+          exists: true
+        - path: "$[0].stock"
+          exists: true
+      min_items: 1
+    description: "Should successfully retrieve books with valid AUTH-TOKEN"
+
+# Success criteria
+assertions:
+  - "E-TOKEN received in step 1"
+  - "AUTH-TOKEN received in step 2"
+  - "Books list retrieved in step 3"
+  - "All steps completed successfully"

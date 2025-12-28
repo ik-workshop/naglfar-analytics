@@ -1,0 +1,23 @@
+# Capacity Test Results
+results/
+target/
+*.log
+
+# Gatling
+**/gatling/
+*.cache
+
+# Scala/SBT
+*.class
+*.jar
+project/target/
+project/project/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.bsp/
+.metals/
+.bloop/

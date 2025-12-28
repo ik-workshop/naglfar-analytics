@@ -17,6 +17,9 @@ help:
 -include services/auth-service/helpers.mk
 -include services/naglfar-validation/helpers.mk
 -include services/naglfar-event-consumer/helpers.mk
+-include testing/e2e/helpers.mk
+-include testing/performance/helpers.mk
+-include testing/capacity/helpers.mk
 
 restore: ## Restore .NET dependencies for all services
 	@echo "Restoring .NET dependencies..."

@@ -1,0 +1,163 @@
+name: "Full User Flow Capacity Test"
+description: "End-to-end capacity test: browse, cart, checkout"
+baseUrl: "${BASE_URL:-http://localhost}"
+
+# Realistic user load pattern
+injection:
+  - type: rampUsers
+    users: 5
+    duration: 30s
+  - type: constantUsersPerSec
+    rate: 2
+    duration: 3m
+  - type: rampUsers
+    users: 20
+    duration: 1m
+  - type: constantUsersPerSec
+    rate: 5
+    duration: 2m
+  - type: rampUsers
+    users: 0
+    duration: 30s
+
+# Performance thresholds
+thresholds:
+  global:
+    successRate: 90.0  # 90% success rate for full flow
+    maxResponseTime: 3000
+  requests:
+    browse:
+      p95: 500
+    addToCart:
+      p95: 800
+    checkout:
+      p95: 1500
+      successRate: 95.0
+
+# Complete user journey
+scenarios:
+  - name: "Complete Purchase Journey"
+    weight: 100
+
+    steps:
+      # Authentication flow
+      - name: "Browse Books"
+        http:
+          method: GET
+          path: "/api/books?storeId=store-${random(1,5)}"
+          headers:
+            Host: "api.local"
+          checks:
+            - status: 200
+          saveHeaders:
+            - name: "eToken"
+              header: "E-TOKEN"
+            - name: "eTokenId"
+              header: "E-TOKEN-ID"
+
+      - name: "Get Auth Token"
+        condition: "eToken != null"
+        http:
+          method: GET
+          path: "/auth?eToken=${eToken}&eTokenId=${eTokenId}"
+          headers:
+            Host: "api.local"
+          saveHeaders:
+            - name: "authToken"
+              header: "AUTH-TOKEN"
+            - name: "authTokenId"
+              header: "AUTH-TOKEN-ID"
+
+      # Browse and select books
+      - name: "Browse Authenticated"
+        pause: 2s
+        http:
+          method: GET
+          path: "/api/books?storeId=store-${storeId}"
+          headers:
+            Host: "api.local"
+            AUTH-TOKEN: "${authToken}"
+          checks:
+            - status: 200
+            - jsonPath: "$[*]"
+          saveJsonPath:
+            - name: "firstBookId"
+              path: "$[0].id"
+            - name: "secondBookId"
+              path: "$[1].id"
+
+      # Add to cart
+      - name: "Add First Book to Cart"
+        pause: 3s
+        http:
+          method: POST
+          path: "/api/cart"
+          headers:
+            Host: "api.local"
+            AUTH-TOKEN: "${authToken}"
+            Content-Type: "application/json"
+          body: |
+            {
+              "bookId": ${firstBookId},
+              "quantity": 1,
+              "storeId": "store-${storeId}"
+            }
+          checks:
+            - status: 200
+
+      - name: "Add Second Book to Cart"
+        pause: 2s
+        http:
+          method: POST
+          path: "/api/cart"
+          headers:
+            Host: "api.local"
+            AUTH-TOKEN: "${authToken}"
+            Content-Type: "application/json"
+          body: |
+            {
+              "bookId": ${secondBookId},
+              "quantity": 2,
+              "storeId": "store-${storeId}"
+            }
+          checks:
+            - status: 200
+
+      # View cart
+      - name: "View Cart"
+        pause: 2s
+        http:
+          method: GET
+          path: "/api/cart"
+          headers:
+            Host: "api.local"
+            AUTH-TOKEN: "${authToken}"
+          checks:
+            - status: 200
+            - jsonPath: "$.items[*]"
+            - jsonPath: "$.total"
+          saveJsonPath:
+            - name: "cartTotal"
+              path: "$.total"
+
+      # Checkout
+      - name: "Checkout"
+        pause: 5s
+        http:
+          method: POST
+          path: "/api/checkout"
+          headers:
+            Host: "api.local"
+            AUTH-TOKEN: "${authToken}"
+            Content-Type: "application/json"
+          body: |
+            {
+              "paymentMethod": "credit_card"
+            }
+          checks:
+            - status: 200
+            - jsonPath: "$.orderId"
+            - jsonPath: "$.status"
+          saveJsonPath:
+            - name: "orderId"
+              path: "$.orderId"

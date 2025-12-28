@@ -224,6 +224,293 @@ naglfar_redis_connection_status 1
 
 ---
 
+### 2025-12-28 (Part 3) - Testing Infrastructure: E2E, Performance, and Capacity Testing
+
+#### Added
+
+- **✅ End-to-End Testing Framework** (`testing/e2e/`):
+  - **Technology**: Python 3.12 with YAML-driven scenarios
+  - **Innovation**: Declarative test scenarios (no Python code needed for new tests)
+  - **Purpose**: Test user journeys through the Naglfar Analytics platform
+  - **Architecture**: Clean separation - scenarios in `scenarios/`, code in `tests/`
+  - **YAML Scenarios**:
+    - `scenarios/browse-books.yaml` - Browse journey with authentication flow
+    - `scenarios/purchase-book.yaml` - Complete purchase flow (browse → cart → checkout)
+    - `scenarios/full-user-flow.yaml` - Full user journey with multiple items
+  - **Components**:
+    - `tests/scenario_runner.py` - Generic YAML scenario executor
+    - `tests/naglfar_test.py` - Legacy CLI (for backward compatibility)
+    - `tests/base_journey.py` - Base class handling authentication flow
+    - `tests/journeys/` - Individual journey implementations
+    - `tests/config.py` - Configuration management
+    - `tests/models.py` - Data models (Book, Cart, Order, TestResult)
+  - **YAML Features**:
+    - HTTP request configuration (method, path, params, headers, body)
+    - Response validation (status, headers, JSON path assertions)
+    - Variable extraction and interpolation (`{variable}`)
+    - JSON path querying with jsonpath-ng
+    - Custom assertions and success criteria
+    - Result display formatting
+  - **Makefile Commands**:
+    - `make e2e-all` - Run all E2E tests
+    - `make e2e-browse` - Browse books test (YAML)
+    - `make e2e-purchase` - Purchase book test (YAML)
+    - `make e2e-full-flow` - Complete user flow (YAML)
+    - `make e2e-scenario SCENARIO=path` - Run custom YAML scenario
+    - `make e2e-list-scenarios` - List available scenarios
+    - `make e2e-results` - View test results
+    - `make e2e-clean` - Clean results
+    - `make e2e-shell` - Debug in container
+
+- **✅ Performance Testing Framework** (`testing/performance/`):
+  - **Technology**: Grafana k6 (latest)
+  - **Purpose**: Load and stress testing for capacity planning
+  - **Test Scenarios**:
+    - Browse books load test (up to 50 VUs)
+    - Full user flow test (up to 20 VUs)
+    - Stress test (up to 300 VUs)
+  - **Features**:
+    - Custom metrics (browse_latency, checkout_success, total_orders)
+    - Performance thresholds (p95, p99, error rates)
+    - JSON output for result analysis
+    - Mixed user behavior scenarios
+  - **Tests**:
+    - `browse-books.js` - Browse capacity with spike load
+    - `full-user-flow.js` - Complete journey testing
+    - `stress-test.js` - Breaking point discovery
+  - **Makefile Commands**:
+    - `make perf-all` - Run all performance tests
+    - `make perf-browse` - Browse load test
+    - `make perf-full-flow` - Full flow test
+    - `make perf-stress` - Stress test
+    - `make perf-results` - View results summary
+    - `make perf-compare` - Compare last two runs
+
+- **✅ Capacity Testing Framework** (`testing/capacity/`):
+  - **Technology**: Gatling 3.10.3 with Scala 2.13.12
+  - **Innovation**: YAML-driven test scenarios (no Scala code needed)
+  - **Build Tools**: SBT 1.11.7, GraalVM 21.0.2
+  - **YAML Features**:
+    - Declarative load injection profiles (rampUsers, constantUsersPerSec, atOnceUsers)
+    - HTTP request configuration (GET, POST, PUT, DELETE)
+    - Response validation (status, jsonPath, responseTime)
+    - Variable extraction and interpolation
+    - Conditional execution
+    - Think time (pauses)
+    - Random values (${random(min,max)})
+    - Performance thresholds and assertions
+    - Multiple scenarios with weights
+  - **Components**:
+    - `YamlScenarioRunner.scala` - Generic Gatling simulation that reads YAML
+    - `ScenarioConfig.scala` - Data models for YAML parsing
+    - `scenarios/` - YAML scenario definitions
+  - **Test Scenarios**:
+    - `browse-books.yaml` - Browse capacity (up to 50 users)
+    - `full-user-flow.yaml` - Complete journey (up to 20 users)
+    - `stress-test.yaml` - Mixed workload stress (up to 300 users)
+  - **Makefile Commands**:
+    - `make capacity-all` - Run all capacity tests
+    - `make capacity-browse` - Browse capacity test
+    - `make capacity-full-flow` - Full flow capacity test
+    - `make capacity-stress` - System stress test
+    - `make capacity-results` - View results summary
+    - `make capacity-report` - Open Gatling HTML report
+
+#### Modified
+
+- **`Makefile`**:
+  - Added includes for testing framework helpers:
+    - `-include testing/e2e/helpers.mk`
+    - `-include testing/performance/helpers.mk`
+    - `-include testing/capacity/helpers.mk`
+  - All testing commands now available from project root
+
+- **`README.md`**:
+  - Added comprehensive **Testing** section with three frameworks
+  - Updated **Project Structure** to show `testing/` directory
+  - Added usage examples for each testing framework
+  - Included YAML scenario example for capacity testing
+
+#### Documentation
+
+- **`testing/e2e/README.md`** (Comprehensive E2E Testing Guide):
+  - Quick Start with Docker commands
+  - Prerequisites and installation
+  - User journey descriptions with example outputs
+  - Makefile commands reference table
+  - Architecture and file structure
+  - Authentication flow explanation
+  - Troubleshooting section
+  - Adding new journeys guide
+
+- **`testing/performance/README.md`** (Performance Testing Guide):
+  - Quick Start with Docker commands
+  - Test scenarios with load patterns
+  - Makefile commands reference table
+  - Test results analysis (viewing, comparing)
+  - Understanding k6 output (metrics, percentiles)
+  - Performance baselines and scaling guidelines
+  - Prometheus metrics integration
+  - Troubleshooting and best practices
+
+- **`testing/capacity/README.md`** (Capacity Testing Guide):
+  - Quick Start with Docker commands
+  - YAML scenario format and schema
+  - Injection types (rampUsers, constantUsersPerSec, atOnceUsers)
+  - HTTP request configuration
+  - Variable interpolation and random values
+  - Conditional execution and think time
+  - Makefile commands reference table
+  - Test results and Gatling reports
+  - Creating custom scenarios guide
+  - Performance baselines and capacity planning
+  - Best practices and advanced features
+
+- **`testing/capacity/scenarios/README.md`** (YAML Schema Reference):
+  - Complete YAML schema documentation
+  - All supported features with examples
+  - Variable interpolation guide
+  - Random values and environment variables
+  - Example complete scenario
+  - Creating new scenarios guide
+  - Validation and best practices
+
+#### Technical Details
+
+**YAML Scenario Example**:
+```yaml
+name: "Browse Books Capacity Test"
+baseUrl: "${BASE_URL:-http://localhost}"
+
+injection:
+  - type: rampUsers
+    users: 10
+    duration: 30s
+  - type: constantUsersPerSec
+    rate: 5
+    duration: 2m
+
+thresholds:
+  global:
+    successRate: 95.0
+    maxResponseTime: 2000
+  requests:
+    browse:
+      p95: 500
+
+scenarios:
+  - name: "Browse Books from Store"
+    weight: 100
+    steps:
+      - name: "Initial Browse Request"
+        http:
+          method: GET
+          path: "/api/books?storeId=store-1"
+          headers:
+            Host: "api.local"
+          checks:
+            - status: 200
+            - jsonPath: "$[0].title"
+          saveHeaders:
+            - name: "authToken"
+              header: "AUTH-TOKEN"
+```
+
+**Docker Images**:
+- E2E: `python:3.12-slim`
+- Performance: `grafana/k6:latest`
+- Capacity: `sbtscala/scala-sbt:graalvm-community-21.0.2_1.11.7_3.3.7`
+
+**Result Storage**:
+- All frameworks save results to timestamped files in `results/` directories
+- E2E: `.log` files with test execution details
+- Performance: `.json` files with k6 metrics
+- Capacity: Gatling HTML reports with detailed charts
+
+#### Files Added
+
+**E2E Testing**:
+- `testing/e2e/scenarios/browse-books.yaml` - Browse journey YAML scenario
+- `testing/e2e/scenarios/purchase-book.yaml` - Purchase journey YAML scenario
+- `testing/e2e/scenarios/full-user-flow.yaml` - Full flow YAML scenario
+- `testing/e2e/tests/scenario_runner.py` - Generic YAML scenario executor
+- `testing/e2e/tests/naglfar_test.py` - Legacy CLI with argparse
+- `testing/e2e/tests/base_journey.py` - Base class for journeys
+- `testing/e2e/tests/config.py` - Configuration management
+- `testing/e2e/tests/models.py` - Data models
+- `testing/e2e/tests/journeys/__init__.py`
+- `testing/e2e/tests/journeys/browse_books.py`
+- `testing/e2e/tests/journeys/purchase_book.py`
+- `testing/e2e/tests/journeys/full_user_flow.py`
+- `testing/e2e/requirements.txt` - Python dependencies (added pyyaml, jsonpath-ng)
+- `testing/e2e/Dockerfile` - Docker image definition
+- `testing/e2e/helpers.mk` - Make commands
+- `testing/e2e/.gitignore`
+- `testing/e2e/README.md`
+
+**Performance Testing**:
+- `testing/performance/browse-books.js` - Browse load test
+- `testing/performance/full-user-flow.js` - Full flow test
+- `testing/performance/stress-test.js` - Stress test
+- `testing/performance/Dockerfile` - k6 Docker image
+- `testing/performance/helpers.mk` - Make commands
+- `testing/performance/.gitignore`
+- `testing/performance/README.md`
+
+**Capacity Testing**:
+- `testing/capacity/build.sbt` - Scala build configuration
+- `testing/capacity/project/build.properties` - SBT 1.11.7
+- `testing/capacity/project/plugins.sbt` - Gatling plugin 4.17.8
+- `testing/capacity/src/test/scala/simulations/YamlScenarioRunner.scala`
+- `testing/capacity/src/test/scala/simulations/models/ScenarioConfig.scala`
+- `testing/capacity/scenarios/browse-books.yaml`
+- `testing/capacity/scenarios/full-user-flow.yaml`
+- `testing/capacity/scenarios/stress-test.yaml`
+- `testing/capacity/scenarios/README.md` - YAML schema reference
+- `testing/capacity/Dockerfile` - GraalVM-based image
+- `testing/capacity/helpers.mk` - Make commands
+- `testing/capacity/.gitignore`
+- `testing/capacity/README.md`
+
+**Results Directories**:
+- `testing/e2e/results/.gitkeep`
+- `testing/performance/results/.gitkeep`
+- `testing/capacity/results/.gitkeep`
+
+#### Benefits
+
+**Comprehensive Testing Strategy**:
+- **E2E**: Validates user journeys and business logic
+- **Performance**: Measures response times and throughput under load
+- **Capacity**: Discovers breaking points and capacity limits
+
+**Docker-First Approach**:
+- Consistent execution across environments
+- No local Python/Node/Java/Scala installation needed
+- Isolated test environments
+- Easy CI/CD integration
+
+**YAML-Driven Testing (E2E & Capacity)**:
+- No programming required for new test scenarios
+- Declarative scenario definitions
+- Easy to version control and review
+- Non-developers can create and modify tests
+- Rapid test creation without code changes
+- Clear test intent and structure
+
+**Result Analysis**:
+- E2E: YAML scenarios with step-by-step validation and detailed logs
+- Performance: JSON metrics with jq-based comparison
+- Capacity: Rich Gatling HTML reports with charts
+
+**Architecture Benefits**:
+- **E2E**: Clean separation - scenarios (YAML) separate from test code (Python)
+- **Capacity**: Scenarios (YAML) separate from execution engine (Scala)
+- **Performance**: Scripts separate from Docker execution environment
+- Infrastructure files (Dockerfile, helpers.mk) separate from test logic
+
+---
+
 ### 2025-12-28 (Part 1) - Redis Event Consumer Service Implementation
 
 #### Added

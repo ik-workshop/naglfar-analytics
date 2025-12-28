@@ -1,0 +1,142 @@
+name: "System Stress Test"
+description: "Stress test to find system breaking point"
+baseUrl: "${BASE_URL:-http://localhost}"
+
+# Aggressive load pattern
+injection:
+  - type: rampUsers
+    users: 50
+    duration: 1m
+  - type: rampUsers
+    users: 100
+    duration: 2m
+  - type: constantUsersPerSec
+    rate: 30
+    duration: 2m
+  - type: rampUsers
+    users: 200
+    duration: 2m
+  - type: constantUsersPerSec
+    rate: 50
+    duration: 3m
+  - type: rampUsers
+    users: 300
+    duration: 2m
+  - type: constantUsersPerSec
+    rate: 75
+    duration: 2m
+  - type: rampUsers
+    users: 0
+    duration: 2m
+
+# Relaxed thresholds for stress testing
+thresholds:
+  global:
+    successRate: 70.0  # Lower threshold to observe degradation
+    maxResponseTime: 5000
+  requests:
+    browse:
+      p99: 2000
+    cart:
+      p99: 3000
+
+# Mixed scenario load
+scenarios:
+  # 60% just browsing
+  - name: "Browse Only"
+    weight: 60
+
+    steps:
+      - name: "Browse Books"
+        http:
+          method: GET
+          path: "/api/books?storeId=store-${random(1,10)}"
+          headers:
+            Host: "api.local"
+          checks:
+            - status: 200
+
+      - name: "Browse Another Store"
+        pause: 1s
+        http:
+          method: GET
+          path: "/api/books?storeId=store-${random(1,10)}"
+          headers:
+            Host: "api.local"
+          checks:
+            - status: 200
+
+  # 30% browse and add to cart
+  - name: "Browse and Cart"
+    weight: 30
+
+    steps:
+      - name: "Browse Books"
+        http:
+          method: GET
+          path: "/api/books?storeId=store-${random(1,10)}"
+          headers:
+            Host: "api.local"
+          saveHeaders:
+            - name: "eToken"
+              header: "E-TOKEN"
+
+      - name: "Get Auth"
+        condition: "eToken != null"
+        http:
+          method: GET
+          path: "/auth?eToken=${eToken}"
+          saveHeaders:
+            - name: "authToken"
+              header: "AUTH-TOKEN"
+
+      - name: "Add to Cart"
+        pause: 1s
+        http:
+          method: POST
+          path: "/api/cart"
+          headers:
+            Host: "api.local"
+            AUTH-TOKEN: "${authToken}"
+            Content-Type: "application/json"
+          body: |
+            {
+              "bookId": ${random(1,100)},
+              "quantity": ${random(1,3)},
+              "storeId": "store-${random(1,10)}"
+            }
+
+  # 10% complete checkout
+  - name: "Full Purchase"
+    weight: 10
+
+    steps:
+      - name: "Browse"
+        http:
+          method: GET
+          path: "/api/books?storeId=store-${random(1,10)}"
+          headers:
+            Host: "api.local"
+          saveHeaders:
+            - name: "authToken"
+              header: "AUTH-TOKEN"
+
+      - name: "Add to Cart"
+        pause: 1s
+        http:
+          method: POST
+          path: "/api/cart"
+          headers:
+            AUTH-TOKEN: "${authToken}"
+          body: |
+            {"bookId": ${random(1,50)}, "quantity": 1}
+
+      - name: "Checkout"
+        pause: 2s
+        http:
+          method: POST
+          path: "/api/checkout"
+          headers:
+            AUTH-TOKEN: "${authToken}"
+          checks:
+            - status: 200

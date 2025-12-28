@@ -1,15 +1,15 @@
 # How to Resume Session - Naglfar Analytics Project
 
 > **Purpose**: Quick reference for AI assistants to understand the current state of the Naglfar Analytics project when resuming work.
-> **Last Updated**: 2025-12-27
+> **Last Updated**: 2025-12-28
 
 ---
 
 ## Quick Overview
 
-**Naglfar Analytics** is a multi-service authentication and analytics platform built as a microservices architecture. The system implements a secure authentication gateway with token-based authentication, request validation, and event streaming for analytics.
+**Naglfar Analytics** is a multi-service authentication and analytics platform built as a microservices architecture. The system implements a secure authentication gateway with token-based authentication, request validation, event streaming for analytics, and comprehensive testing infrastructure.
 
-**Current Status**: ✅ Core authentication system fully implemented and documented
+**Current Status**: ✅ Core authentication system, event consumer with metrics, and comprehensive testing infrastructure (E2E, Performance, Capacity)
 
 ---
 
@@ -133,31 +133,46 @@
 
 **Stores**: store-1 (London) through store-10 (Stockholm)
 
-### 4. **Naglfar Event Consumer** (.NET 10.0 Worker Service)
+### 4. **Naglfar Event Consumer** (.NET 10.0 Web Service)
 **Location**: `services/naglfar-event-consumer/`
 
 **Responsibilities**:
 - Subscribe to Redis pub/sub channel (`naglfar-events`)
 - Process E-TOKEN generation events
+- Expose Prometheus metrics for monitoring
 - Foundation for analytics pipeline
 - TODO: Store events in Neo4j, trigger analytics
 
 **Key Files**:
-- `src/NaglfartEventConsumer/Program.cs` - Entry point
+- `src/NaglfartEventConsumer/Program.cs` - Entry point (Web host for metrics)
 - `src/NaglfartEventConsumer/Services/RedisEventConsumer.cs` - Background service
 - `src/NaglfartEventConsumer/Models/NaglfartEvent.cs` - Generic event model
+- `src/NaglfartEventConsumer/Metrics/EventMetrics.cs` - Prometheus metrics
 - `tests/NaglfartEventConsumer.Tests/` - 11 passing tests
+
+**Endpoints**:
+- `/metrics` - Prometheus metrics (port 8080)
+- `/healthz` - Health check
+- `/readyz` - Readiness check
+
+**Prometheus Metrics**:
+- `naglfar_events_processed_total` - Events processed (labels: action, store_id)
+- `naglfar_events_processing_errors_total` - Processing errors (labels: action, error_type)
+- `naglfar_redis_connection_status` - Redis connection status (1=connected, 0=disconnected)
 
 **Configuration**:
 - `Redis:ConnectionString` - Redis connection (default: "localhost:6379")
 - `Redis:Channel` - Pub/sub channel (default: "naglfar-events")
 - `Redis:RetryDelaySeconds` - Retry delay on failure (default: "5")
+- `Logging__LogLevel__*` - Configurable via docker-compose.yml (no rebuild needed)
 
 **Features**:
 - Generic event model (no schema changes for new fields)
 - Automatic reconnection on Redis failure
 - Graceful shutdown
-- Structured logging (Debug level in Development)
+- Prometheus metrics with labels for granular tracking
+- Configurable logging levels via environment variables
+- Changed from Worker SDK to Web SDK for HTTP endpoints
 
 ---
 
@@ -370,12 +385,27 @@ var signature = ComputeHmacSha256(message, _signatureKey);
    - ✅ Redis 8.x with Redis Insight
    - ✅ Custom bridge network
 
-5. **Documentation**
+5. **Event Consumer Observability**
+   - ✅ Prometheus metrics with labels
+   - ✅ Configurable logging via docker-compose.yml
+   - ✅ Health and readiness checks
+   - ✅ Metrics endpoint at port 8083
+
+6. **Testing Infrastructure**
+   - ✅ End-to-End Testing (Python CLI with argparse)
+   - ✅ Performance Testing (k6 load testing)
+   - ✅ Capacity Testing (Gatling with YAML scenarios)
+   - ✅ Docker-first approach for all testing
+   - ✅ Makefile automation for test execution
+
+7. **Documentation**
    - ✅ Complete API documentation
    - ✅ Architecture diagrams
-   - ✅ Comprehensive CHANGELOG
+   - ✅ Comprehensive CHANGELOG (2180+ lines)
    - ✅ Manual token generation guide
    - ✅ Complete authentication flow documentation
+   - ✅ Three comprehensive testing READMEs
+   - ✅ YAML schema reference for capacity testing
 
 ### 🔄 In Progress / TODO
 
@@ -383,9 +413,9 @@ var signature = ComputeHmacSha256(message, _signatureKey);
    - TODO: Replace auto-authentication with actual login/register form
    - Currently: Auto-authenticates with `test@example.com`
 
-2. **Redis Event Consumer**
-   - TODO: Create consumer service to process E-TOKEN events
+2. **Event Storage**
    - TODO: Store analytics data (Phase 2: Neo4j)
+   - TODO: Build analytics dashboard
 
 3. **Advanced Features** (Future)
    - TODO: Rate limiting
@@ -398,25 +428,110 @@ var signature = ComputeHmacSha256(message, _signatureKey);
 
 ## Testing
 
-### Naglfar Validation (.NET)
+### Unit Tests
+
+**Naglfar Validation (.NET)**:
 ```bash
 cd services/naglfar-validation
 dotnet test
 # 33 tests passing
 ```
 
-### Auth Service (Python)
+**Naglfar Event Consumer (.NET)**:
 ```bash
-cd services/auth-service
-# No tests yet - create tests in future
+cd services/naglfar-event-consumer
+dotnet test
+# 11 tests passing
 ```
 
-### Book Store (Python)
+**Book Store (Python)**:
 ```bash
-cd services/book-store
 make test-book-store  # From root
 # 36 tests passing
 ```
+
+**Auth Service (Python)**:
+```bash
+# No tests yet - create tests in future
+```
+
+### End-to-End Tests (Python CLI)
+
+**Purpose**: Test complete user journeys through the system
+
+```bash
+# Run all E2E tests
+make e2e-all
+
+# Individual tests
+make e2e-browse        # Browse books journey
+make e2e-purchase      # Purchase book journey
+make e2e-full-flow     # Complete user flow
+
+# View results
+make e2e-results
+```
+
+**Documentation**: `testing/e2e/README.md`
+
+### Performance Tests (k6)
+
+**Purpose**: Load and stress testing for capacity planning
+
+```bash
+# Run all performance tests
+make perf-all
+
+# Individual tests
+make perf-browse        # Browse load test (up to 50 VUs)
+make perf-full-flow     # Full flow test (up to 20 VUs)
+make perf-stress        # Stress test (up to 300 VUs)
+
+# View and compare results
+make perf-results
+make perf-compare
+```
+
+**Documentation**: `testing/performance/README.md`
+
+### Capacity Tests (Gatling)
+
+**Purpose**: YAML-driven capacity testing to find breaking points
+
+```bash
+# Run all capacity tests
+make capacity-all
+
+# Individual tests
+make capacity-browse        # Browse capacity test
+make capacity-full-flow     # Full flow capacity test
+make capacity-stress        # System stress test
+
+# View results
+make capacity-results
+make capacity-report        # Open HTML report
+```
+
+**Key Feature**: Define test scenarios in YAML without writing Scala code
+
+**Example YAML**:
+```yaml
+name: "Browse Books Test"
+injection:
+  - type: rampUsers
+    users: 10
+    duration: 30s
+scenarios:
+  - name: "Browse Journey"
+    steps:
+      - http:
+          method: GET
+          path: "/api/books"
+          checks:
+            - status: 200
+```
+
+**Documentation**: `testing/capacity/README.md`, `testing/capacity/scenarios/README.md`
 
 ---
 
@@ -431,6 +546,8 @@ docker-compose up
 **Access Points**:
 - Traefik Dashboard: http://localhost:8080/dashboard/
 - Naglfar API: http://localhost:8000/
+- Naglfar Metrics: http://localhost:8000/metrics
+- Event Consumer Metrics: http://localhost:8083/metrics
 - Book Store: http://localhost:8081/
 - Auth Service: http://localhost:8082/
 - Redis Insight: http://localhost:5540/
@@ -507,7 +624,39 @@ echo "AUTH-TOKEN-ID: ${AUTH_TOKEN_ID}"
 
 ## Recent Changes Summary (Last Session)
 
-**2025-12-28**:
+**2025-12-28 (Part 3) - Testing Infrastructure**:
+1. ✅ Created End-to-End Testing framework (Python CLI with argparse)
+   - Browse books, purchase book, full user flow journeys
+   - Docker support with python:3.12-slim
+   - Makefile commands: `make e2e-all`, `make e2e-results`
+2. ✅ Created Performance Testing framework (k6)
+   - Browse, full flow, stress test scenarios (up to 300 VUs)
+   - Custom metrics and thresholds
+   - Result comparison: `make perf-compare`
+3. ✅ Created Capacity Testing framework (Gatling + YAML)
+   - **Innovation**: YAML-driven scenarios (no Scala code needed)
+   - Generic YamlScenarioRunner that reads YAML files
+   - Three ready-to-use scenarios
+   - Rich Gatling HTML reports: `make capacity-report`
+4. ✅ Updated main README with Testing section
+5. ✅ Created comprehensive documentation (4 READMEs, 1 schema reference)
+6. ✅ Integrated all testing frameworks into main Makefile
+
+**2025-12-28 (Part 2) - Prometheus Metrics & Configurable Logging**:
+1. ✅ Added Prometheus metrics to Event Consumer
+   - prometheus-net.AspNetCore 8.2.1
+   - Three metrics: events_processed_total, processing_errors_total, redis_connection_status
+   - Labels: action, store_id for granular tracking
+2. ✅ Changed Event Consumer from Worker SDK to Web SDK
+   - Exposed HTTP endpoints (/metrics, /healthz, /readyz) on port 8083
+   - Changed base image from runtime to aspnet
+3. ✅ Made logging configurable via docker-compose.yml
+   - Both naglfar-validation and naglfar-event-consumer
+   - Environment variables: `Logging__LogLevel__*`
+   - No rebuild needed to change log levels
+4. ✅ Updated documentation with metrics and logging configuration
+
+**2025-12-28 (Part 1) - Redis Event Consumer**:
 1. ✅ Created Naglfar Event Consumer service (.NET 10.0 Worker Service)
 2. ✅ Implemented RedisEventConsumer background service with auto-retry
 3. ✅ Created generic NaglfartEvent model for flexible event handling
@@ -516,7 +665,6 @@ echo "AUTH-TOKEN-ID: ${AUTH_TOKEN_ID}"
 6. ✅ Created 11 unit tests (all passing)
 7. ✅ Added Makefile commands (helpers.mk)
 8. ✅ Comprehensive documentation (README.md)
-9. ✅ Updated CHANGELOG.md and how-to-resume-session.md
 
 **2025-12-27**:
 1. ✅ Implemented AUTH-TOKEN signature validation (HMAC-SHA256)
@@ -554,7 +702,31 @@ curl -H "Host: api.local" -H "AUTH-TOKEN: ${AUTH_TOKEN}" http://localhost/api/v1
 
 ---
 
+## Key Testing Commands
+
+**All tests from project root**:
+```bash
+# Unit tests
+dotnet test services/naglfar-validation/tests/NaglfartAnalytics.Tests/
+dotnet test services/naglfar-event-consumer/tests/NaglfartEventConsumer.Tests/
+make test-book-store
+
+# E2E tests
+make e2e-all            # Run all user journeys
+make e2e-results        # View results
+
+# Performance tests
+make perf-all           # Run all load tests
+make perf-compare       # Compare last two runs
+
+# Capacity tests
+make capacity-all       # Run all capacity tests
+make capacity-report    # Open Gatling HTML report
+```
+
+---
+
 **End of Resume Guide**
-**Last Updated**: 2025-12-27
-**Status**: ✅ Authentication system complete and documented
-**Next Steps**: Build Redis event consumer, add login UI to auth-service
+**Last Updated**: 2025-12-28
+**Status**: ✅ Authentication system, event consumer with metrics, and comprehensive testing infrastructure complete
+**Next Steps**: Execute tests against running system, analyze capacity results, add login UI to auth-service

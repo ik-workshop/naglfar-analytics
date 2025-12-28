@@ -1,0 +1,14 @@
+# Performance Test Results
+results/
+*.json
+*.csv
+*.html
+
+# k6
+k6-report.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

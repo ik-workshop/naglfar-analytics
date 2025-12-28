@@ -1,0 +1,128 @@
+name: "Purchase Book Journey"
+description: "Test complete purchase flow: browse, add to cart, checkout"
+
+# Test configuration
+config:
+  base_url: "${BASE_URL:-http://localhost}"
+  store_id: "store-1"
+  book_id: 1
+  quantity: 1
+  verbose: false
+
+# Test steps
+steps:
+  # Step 1: Browse books to get authentication
+  - name: "Browse books to get E-TOKEN"
+    request:
+      method: GET
+      path: "/api/v1/{store_id}/books"
+      headers:
+        Host: "api.local"
+    expect:
+      status: 200
+      headers:
+        - name: "E-TOKEN"
+          save_as: "e_token"
+        - name: "E-TOKEN-ID"
+          save_as: "e_token_id"
+
+  # Step 2: Get AUTH-TOKEN
+  - name: "Get AUTH-TOKEN from auth service"
+    request:
+      method: GET
+      path: "/api/v1/auth/"
+      params:
+        eToken: "{e_token}"
+        eTokenId: "{e_token_id}"
+        returnUrl: "http://localhost/api/v1/{store_id}/books"
+      headers:
+        Host: "api.local"
+    expect:
+      status: 200
+      headers:
+        - name: "AUTH-TOKEN"
+          save_as: "auth_token"
+        - name: "AUTH-TOKEN-ID"
+          save_as: "auth_token_id"
+
+  # Step 3: Add book to cart
+  - name: "Add book to cart"
+    request:
+      method: POST
+      path: "/api/v1/{store_id}/cart"
+      headers:
+        Host: "api.local"
+        AUTH-TOKEN: "{auth_token}"
+        AUTH-TOKEN-ID: "{auth_token_id}"
+        Content-Type: "application/json"
+      body:
+        book_id: "{book_id}"
+        quantity: "{quantity}"
+    expect:
+      status: 200
+      json:
+        - path: "$.message"
+          exists: true
+    description: "Should successfully add book to cart"
+
+  # Step 4: View cart
+  - name: "View cart contents"
+    request:
+      method: GET
+      path: "/api/v1/{store_id}/cart"
+      headers:
+        Host: "api.local"
+        AUTH-TOKEN: "{auth_token}"
+        AUTH-TOKEN-ID: "{auth_token_id}"
+    expect:
+      status: 200
+      json:
+        - path: "$.items"
+          exists: true
+        - path: "$.total"
+          exists: true
+      save_json:
+        - path: "$.total"
+          as: "cart_total"
+    description: "Should retrieve cart with added items"
+
+  # Step 5: Checkout
+  - name: "Complete checkout"
+    request:
+      method: POST
+      path: "/api/v1/{store_id}/checkout"
+      headers:
+        Host: "api.local"
+        AUTH-TOKEN: "{auth_token}"
+        AUTH-TOKEN-ID: "{auth_token_id}"
+        Content-Type: "application/json"
+      body:
+        payment_method: "credit_card"
+    expect:
+      status: 200
+      json:
+        - path: "$.order_id"
+          exists: true
+          save_as: "order_id"
+        - path: "$.status"
+          value: "completed"
+        - path: "$.total"
+          exists: true
+    description: "Should successfully complete checkout and create order"
+
+# Success criteria
+assertions:
+  - "Book added to cart successfully"
+  - "Cart contains expected items"
+  - "Checkout completed successfully"
+  - "Order ID generated"
+
+# Expected results
+results:
+  display:
+    - label: "Order ID"
+      value: "{order_id}"
+    - label: "Total Amount"
+      value: "{cart_total}"
+    - label: "Items Purchased"
+      value: "{quantity}"

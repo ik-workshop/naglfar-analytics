@@ -1,0 +1,13 @@
+# Naglfar Analytics E2E Testing Dependencies
+
+# HTTP client
+requests==2.31.0
+pyyaml==6.0.1
+jsonpath-ng==1.6.1
+
+# Optional: For better CLI output
+colorama==0.4.6
+
+# Optional: For generating test reports
+pytest==7.4.3
+pytest-html==4.1.1

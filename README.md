@@ -162,6 +162,93 @@ The project uses **modular helper makefiles** for service-specific commands. Eac
 - Easy to add new services without modifying the root Makefile
 - Run `make help` to see all available commands from all services
 
+## Testing
+
+The project includes three comprehensive testing frameworks:
+
+### End-to-End Testing (Python CLI)
+
+Python-based CLI tool for testing user journeys through the system.
+
+```bash
+# Run all E2E tests
+make e2e-all
+
+# Run individual tests
+make e2e-browse        # Browse books journey
+make e2e-purchase      # Purchase book journey
+make e2e-full-flow     # Complete user flow
+
+# View results
+make e2e-results
+```
+
+📖 **Documentation**: [testing/e2e/README.md](testing/e2e/README.md)
+
+### Performance Testing (k6)
+
+Load and stress testing using Grafana k6.
+
+```bash
+# Run all performance tests
+make perf-all
+
+# Run individual tests
+make perf-browse        # Browse books load test
+make perf-full-flow     # Full user flow test
+make perf-stress        # Stress test (up to 300 VUs)
+
+# View and compare results
+make perf-results
+make perf-compare
+```
+
+📖 **Documentation**: [testing/performance/README.md](testing/performance/README.md)
+
+### Capacity Testing (Gatling)
+
+YAML-driven capacity testing with Gatling for defining test scenarios without code.
+
+```bash
+# Run all capacity tests
+make capacity-all
+
+# Run individual tests
+make capacity-browse        # Browse capacity test
+make capacity-full-flow     # Full flow capacity test
+make capacity-stress        # System stress test
+
+# View results and reports
+make capacity-results
+make capacity-report        # Open HTML report
+```
+
+**Key Features**:
+- Define test scenarios in YAML files (no Scala code needed)
+- Flexible load injection profiles (ramp, constant, spike)
+- Built-in authentication flow support (E-TOKEN/AUTH-TOKEN)
+- Rich HTML reports with charts and metrics
+- Performance thresholds and assertions
+
+📖 **Documentation**: [testing/capacity/README.md](testing/capacity/README.md)
+
+**Example YAML Scenario**:
+```yaml
+name: "Browse Books Test"
+injection:
+  - type: rampUsers
+    users: 10
+    duration: 30s
+scenarios:
+  - name: "Browse Journey"
+    steps:
+      - http:
+          method: GET
+          path: "/api/books"
+          checks:
+            - status: 200
+```
+
 ## Project Structure
 
 ```
@@ -201,9 +288,10 @@ naglfar-analytics/                          # Monorepo root
 │   ├── dotnet/                             # Shared .NET libraries
 │   └── python/                             # Shared Python libraries
 │
-├── tests/                                  # Cross-service tests (future)
-│   ├── integration/                        # Integration tests
-│   └── e2e/                                # End-to-end tests
+├── testing/                                # Testing frameworks
+│   ├── e2e/                                # End-to-end tests (Python CLI)
+│   ├── performance/                        # Performance tests (k6)
+│   └── capacity/                           # Capacity tests (Gatling + YAML)
 │
 ├── scripts/                                # Automation scripts (future)
 │   └── ...

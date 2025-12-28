@@ -1,0 +1,180 @@
+name: "Full User Flow Journey"
+description: "Complete user journey: browse books, add multiple items to cart, view cart, checkout"
+
+# Test configuration
+config:
+  base_url: "${BASE_URL:-http://localhost}"
+  store_id: "store-1"
+  num_books: 2
+  verbose: false
+
+# Test steps
+steps:
+  # Authentication flow
+  - name: "Browse books to trigger authentication"
+    request:
+      method: GET
+      path: "/api/v1/{store_id}/books"
+      headers:
+        Host: "api.local"
+    expect:
+      status: 200
+      headers:
+        - name: "E-TOKEN"
+          save_as: "e_token"
+        - name: "E-TOKEN-ID"
+          save_as: "e_token_id"
+      json:
+        - path: "$"
+          exists: true
+      save_json:
+        - path: "$[*]"
+          as: "books_list"
+
+  - name: "Get AUTH-TOKEN"
+    request:
+      method: GET
+      path: "/api/v1/auth/"
+      params:
+        eToken: "{e_token}"
+        eTokenId: "{e_token_id}"
+        returnUrl: "http://localhost/api/v1/{store_id}/books"
+      headers:
+        Host: "api.local"
+    expect:
+      status: 200
+      headers:
+        - name: "AUTH-TOKEN"
+          save_as: "auth_token"
+        - name: "AUTH-TOKEN-ID"
+          save_as: "auth_token_id"
+
+  # Browse authenticated
+  - name: "Browse books with authentication"
+    request:
+      method: GET
+      path: "/api/v1/{store_id}/books"
+      headers:
+        Host: "api.local"
+        AUTH-TOKEN: "{auth_token}"
+        AUTH-TOKEN-ID: "{auth_token_id}"
+    expect:
+      status: 200
+      min_items: 1
+      save_json:
+        - path: "$[0].id"
+          as: "first_book_id"
+        - path: "$[0].title"
+          as: "first_book_title"
+        - path: "$[0].price"
+          as: "first_book_price"
+        - path: "$[1].id"
+          as: "second_book_id"
+        - path: "$[1].title"
+          as: "second_book_title"
+        - path: "$[1].price"
+          as: "second_book_price"
+    description: "Retrieve book catalog and save book details"
+
+  # Add first book to cart
+  - name: "Add first book to cart"
+    request:
+      method: POST
+      path: "/api/v1/{store_id}/cart"
+      headers:
+        Host: "api.local"
+        AUTH-TOKEN: "{auth_token}"
+        Content-Type: "application/json"
+      body:
+        book_id: "{first_book_id}"
+        quantity: 1
+    expect:
+      status: 200
+      json:
+        - path: "$.message"
+          exists: true
+
+  # Add second book to cart
+  - name: "Add second book to cart"
+    request:
+      method: POST
+      path: "/api/v1/{store_id}/cart"
+      headers:
+        Host: "api.local"
+        AUTH-TOKEN: "{auth_token}"
+        Content-Type: "application/json"
+      body:
+        book_id: "{second_book_id}"
+        quantity: 2
+    expect:
+      status: 200
+
+  # View cart
+  - name: "View cart contents"
+    request:
+      method: GET
+      path: "/api/v1/{store_id}/cart"
+      headers:
+        Host: "api.local"
+        AUTH-TOKEN: "{auth_token}"
+    expect:
+      status: 200
+      json:
+        - path: "$.items"
+          exists: true
+        - path: "$.total"
+          exists: true
+      save_json:
+        - path: "$.items"
+          as: "cart_items"
+        - path: "$.total"
+          as: "cart_total"
+    description: "Verify cart contains all added items"
+
+  # Checkout
+  - name: "Complete checkout"
+    request:
+      method: POST
+      path: "/api/v1/{store_id}/checkout"
+      headers:
+        Host: "api.local"
+        AUTH-TOKEN: "{auth_token}"
+        Content-Type: "application/json"
+      body:
+        payment_method: "credit_card"
+    expect:
+      status: 200
+      json:
+        - path: "$.order_id"
+          exists: true
+          save_as: "order_id"
+        - path: "$.status"
+          value: "completed"
+        - path: "$.total"
+          exists: true
+          save_as: "order_total"
+
+# Success criteria
+assertions:
+  - "Successfully authenticated with E-TOKEN and AUTH-TOKEN"
+  - "Retrieved books catalog"
+  - "Added 2 different books to cart"
+  - "Cart contains correct items and total"
+  - "Checkout completed successfully"
+  - "Order created with valid order_id"
+
+# Expected results
+results:
+  display:
+    - label: "Books Browsed"
+      value: "Available in store"
+    - label: "Books Purchased"
+      value: "2 items"
+    - label: "First Book"
+      value: "{first_book_title} (${first_book_price})"
+    - label: "Second Book"
+      value: "{second_book_title} (${second_book_price})"
+    - label: "Order ID"
+      value: "{order_id}"
+    - label: "Total Amount"
+      value: "${cart_total}"
