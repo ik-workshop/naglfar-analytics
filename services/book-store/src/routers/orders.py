@@ -1,10 +1,12 @@
 """Orders router - order creation and checkout"""
 from datetime import datetime, timedelta
 from typing import List
-from fastapi import APIRouter, HTTPException, Depends, status, Path
+from fastapi import APIRouter, HTTPException, Depends, status, Path, Request
 from storage.database import db
 from storage.models import CheckoutRequest, OrderResponse, CartItemResponse
 from dependencies import get_current_user
+from message.event_helper import publish_endpoint_event
+from message.events import ActionType
 
 router = APIRouter(
     prefix="/api/v1/{store_id}",
@@ -15,6 +17,7 @@ router = APIRouter(
 
 @router.post("/checkout", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 async def checkout(
+    request: Request,
     store_id: str = Path(..., description="Store ID"),
     checkout_data: CheckoutRequest = ...,
     current_user: dict = Depends(get_current_user)
@@ -79,6 +82,18 @@ async def checkout(
     # Calculate estimated delivery
     estimated_delivery = (datetime.utcnow() + timedelta(days=5)).strftime("%Y-%m-%d")
 
+    # Publish event after successful checkout
+    await publish_endpoint_event(
+        request=request,
+        action=ActionType.CHECKOUT,
+        user_id=current_user["id"],
+        data={
+            "order_id": order["id"],
+            "total_amount": float(order["total_amount"]),
+            "payment_method": checkout_data.payment_method
+        }
+    )
+
     return OrderResponse(
         id=order["id"],
         user_id=order["user_id"],
@@ -94,6 +109,7 @@ async def checkout(
 
 @router.get("/orders/{order_id}", response_model=OrderResponse)
 async def get_order(
+    request: Request,
     order_id: int,
     current_user: dict = Depends(get_current_user)
 ):
@@ -137,6 +153,14 @@ async def get_order(
     tax = subtotal * 0.08
     estimated_delivery = (order["created_at"] + timedelta(days=5)).strftime("%Y-%m-%d")
 
+    # Publish event after successful operation
+    await publish_endpoint_event(
+        request=request,
+        action=ActionType.VIEW_ORDER,
+        user_id=current_user["id"],
+        data={"order_id": order_id}
+    )
+
     return OrderResponse(
         id=order["id"],
         user_id=order["user_id"],
@@ -151,7 +175,10 @@ async def get_order(
 
 
 @router.get("/orders", response_model=List[OrderResponse])
-async def list_orders(current_user: dict = Depends(get_current_user)):
+async def list_orders(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
     """
     List all orders for the current user
 
@@ -194,5 +221,12 @@ async def list_orders(current_user: dict = Depends(get_current_user)):
             created_at=order["created_at"],
             estimated_delivery=estimated_delivery
         ))
+
+    # Publish event after successful operation
+    await publish_endpoint_event(
+        request=request,
+        action=ActionType.VIEW_ORDERS,
+        user_id=current_user["id"]
+    )
 
     return order_responses

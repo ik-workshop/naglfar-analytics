@@ -6,6 +6,10 @@ from routers import books, auth, cart, orders, inventory
 from internal import admin
 from abuse.detector import log_abuse_attempt
 
+# Import validation and middleware components
+from validation import RouteSpecLoader, RouteIntrospector, RouteValidator, HeaderEnforcementMiddleware
+from middleware import SessionMiddleware, RequestContextMiddleware
+
 app = FastAPI(
     title="Book Store API",
     description="Protected service demonstrating Naglfar abuse protection",
@@ -13,6 +17,41 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+
+@app.on_event("startup")
+async def startup_validation():
+    """
+    Validate routes on startup
+    Ensures all routes comply with routes.yaml specification
+    """
+    print("\n=== Starting Route Validation ===")
+
+    try:
+        # Load route specifications
+        spec_loader = RouteSpecLoader()
+        print(f"✓ Loaded {len(spec_loader.get_all_routes())} route specifications")
+
+        # Introspect actual routes
+        introspector = RouteIntrospector(app)
+        print(f"✓ Found {len(introspector.get_all_endpoints())} actual endpoints")
+
+        # Validate routes
+        validator = RouteValidator(spec_loader, introspector)
+        report = validator.validate()
+
+        # Print validation report
+        report.print_summary()
+
+        # Optionally raise error if validation fails (strict mode)
+        # Uncomment the following line to fail startup on validation errors
+        # if report.has_errors:
+        #     raise ValueError("Route validation failed. Fix errors before starting.")
+
+    except Exception as e:
+        print(f"❌ Validation error: {e}")
+        # Uncomment to fail startup on validation errors
+        raise
 
 
 class AbuseDetectionMiddleware(BaseHTTPMiddleware):
@@ -34,7 +73,7 @@ class AbuseDetectionMiddleware(BaseHTTPMiddleware):
         return response
 
 
-# CORS middleware
+# CORS middleware (must be first)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, specify actual origins
@@ -42,6 +81,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Session tracking middleware (generates/tracks SESSION_ID)
+app.add_middleware(SessionMiddleware)
+
+# Request context middleware (extracts store_id, etc.)
+app.add_middleware(RequestContextMiddleware)
+
+# Header enforcement middleware (validates AUTH_TOKEN, AUTH_TOKEN_ID)
+# WARNING: This will reject requests missing required headers
+# Uncomment when ready to enforce header requirements
+# app.add_middleware(HeaderEnforcementMiddleware)
 
 # Abuse detection middleware
 # app.add_middleware(AbuseDetectionMiddleware)
@@ -67,9 +117,12 @@ async def root():
 
 
 @app.get("/api/v1/stores")
-async def list_stores():
+async def list_stores(request: Request):
     """List all available stores"""
     from storage.database import db
+    from message.event_helper import publish_endpoint_event
+    from message.events import ActionType
+
     stores = [
         {
             "store_id": store_id,
@@ -78,6 +131,14 @@ async def list_stores():
         }
         for store_id, location in db.stores.items()
     ]
+
+    # Publish event after successful operation
+    await publish_endpoint_event(
+        request=request,
+        action=ActionType.LIST_STORES,
+        user_id=None  # Unauthenticated endpoint
+    )
+
     return {
         "stores": stores,
         "total_count": len(stores)

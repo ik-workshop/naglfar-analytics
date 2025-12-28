@@ -1,8 +1,10 @@
 """Inventory router - check stock availability"""
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Query, Path
+from fastapi import APIRouter, HTTPException, Query, Path, Request
 from storage.database import db
 from storage.models import InventoryResponse
+from message.event_helper import publish_endpoint_event
+from message.events import ActionType
 
 router = APIRouter(
     prefix="/api/v1/{store_id}/inventory",
@@ -12,6 +14,7 @@ router = APIRouter(
 
 @router.get("", response_model=List[InventoryResponse])
 async def check_inventory(
+    request: Request,
     store_id: str = Path(..., description="Store ID"),
     book_id: Optional[int] = Query(None, description="Check specific book ID")
 ):
@@ -23,30 +26,40 @@ async def check_inventory(
     """
     if not db.is_valid_store(store_id):
         raise HTTPException(status_code=404, detail=f"Store '{store_id}' not found")
+
     if book_id:
         book = db.get_book(book_id)
         if not book:
             raise HTTPException(status_code=404, detail="Book not found")
 
-        return [InventoryResponse(
+        inventory = [InventoryResponse(
             book_id=book["id"],
             title=book["title"],
             quantity=book["stock_count"],
             in_stock=book["stock_count"] > 0,
             last_updated=book["created_at"]
         )]
+    else:
+        # Return inventory for all books
+        books = db.get_books()
+        inventory = [
+            InventoryResponse(
+                book_id=book["id"],
+                title=book["title"],
+                quantity=book["stock_count"],
+                in_stock=book["stock_count"] > 0,
+                last_updated=book["created_at"]
+            )
+            for book in books
+        ]
 
-    # Return inventory for all books
-    books = db.get_books()
-    inventory = [
-        InventoryResponse(
-            book_id=book["id"],
-            title=book["title"],
-            quantity=book["stock_count"],
-            in_stock=book["stock_count"] > 0,
-            last_updated=book["created_at"]
-        )
-        for book in books
-    ]
+    # Publish event after successful operation
+    event_data = {"book_id": book_id} if book_id else None
+    await publish_endpoint_event(
+        request=request,
+        action=ActionType.CHECK_INVENTORY,
+        user_id=None,  # Unauthenticated endpoint
+        data=event_data
+    )
 
     return inventory

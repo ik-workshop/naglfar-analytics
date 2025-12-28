@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, status, Query, Response
 from fastapi.responses import RedirectResponse
 from storage.database import db
 from storage.models import UserRegister, UserLogin, Token
+from utils import get_random_user
 
 router = APIRouter(
     prefix="/api/v1/auth",
@@ -127,24 +128,24 @@ async def auth_page(
     store_id = e_token_data["store_id"]
 
     # TODO: Show login/register form here
-    # For now, auto-authenticate with test user
-    test_user = db.get_user_by_email("test@example.com")
-    if not test_user:
+    # For now, auto-authenticate with random user from users.yaml
+    random_user = get_random_user()
+    if not random_user:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Test user not found"
+            detail="No users available for authentication"
         )
 
     # Generate AUTH-TOKEN
-    auth_token = create_auth_token(store_id, test_user["id"])
+    auth_token = create_auth_token(store_id, random_user["id"])
 
     # Compute AUTH-TOKEN-ID (SHA256 hash for tracking)
     auth_token_id = hashlib.sha256(auth_token.encode('utf-8')).hexdigest()
 
     # Create redirect response with AUTH-TOKEN header
     response = RedirectResponse(url=return_url, status_code=status.HTTP_302_FOUND)
-    response.headers["AUTH-TOKEN"] = auth_token
-    response.headers["AUTH-TOKEN-ID"] = auth_token_id
+    response.headers["AUTH_TOKEN"] = auth_token
+    response.headers["AUTH_TOKEN_ID"] = auth_token_id
 
     return response
 

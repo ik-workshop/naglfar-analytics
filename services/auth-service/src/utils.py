@@ -4,7 +4,11 @@ import json
 import os
 import logging
 import base64
+import random
+import yaml
+from pathlib import Path
 from datetime import datetime
+from typing import Optional, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -109,3 +113,109 @@ def analyze_repository_structure(clone_dir):
         'file_count': file_count,
         'dir_count': dir_count
     }
+
+
+# User loading functionality
+_users_cache: Optional[List[Dict]] = None
+
+
+def load_users(users_file: Optional[Path] = None) -> List[Dict]:
+    """
+    Load users from users.yaml file
+
+    Args:
+        users_file: Path to users.yaml (default: ../users.yaml from service root)
+
+    Returns:
+        List of user dictionaries with id, email, password fields
+    """
+    global _users_cache
+
+    # Return cached users if available
+    if _users_cache is not None:
+        return _users_cache
+
+    if users_file is None:
+        # Get path relative to this file: utils.py -> src/ -> service_root/users.yaml
+        current_file = Path(__file__)
+        users_file = current_file.parent.parent / "users.yaml"
+
+    if not users_file.exists():
+        logger.warning(f"Users file not found: {users_file}")
+        return []
+
+    try:
+        with open(users_file, 'r') as f:
+            data = yaml.safe_load(f)
+
+        if 'users' not in data:
+            logger.warning("No 'users' key found in users.yaml")
+            return []
+
+        _users_cache = data['users']
+        logger.info(f"Loaded {len(_users_cache)} users from {users_file}")
+        return _users_cache
+
+    except Exception as e:
+        logger.error(f"Error loading users from {users_file}: {e}")
+        return []
+
+
+def get_random_user() -> Optional[Dict]:
+    """
+    Get a random user from users.yaml
+
+    Returns:
+        Random user dictionary with id, email, password fields, or None if no users available
+    """
+    users = load_users()
+
+    if not users:
+        logger.error("No users available to select from")
+        return None
+
+    random_user = random.choice(users)
+    logger.debug(f"Selected random user: {random_user['email']} (id: {random_user['id']})")
+    return random_user
+
+
+def get_user_by_email(email: str) -> Optional[Dict]:
+    """
+    Get a user by email from users.yaml
+
+    Args:
+        email: Email address to look up
+
+    Returns:
+        User dictionary if found, None otherwise
+    """
+    users = load_users()
+
+    for user in users:
+        if user['email'] == email:
+            logger.debug(f"Found user by email: {email} (id: {user['id']})")
+            return user
+
+    logger.debug(f"User not found by email: {email}")
+    return None
+
+
+def get_user_by_id(user_id: int) -> Optional[Dict]:
+    """
+    Get a user by ID from users.yaml
+
+    Args:
+        user_id: User ID to look up
+
+    Returns:
+        User dictionary if found, None otherwise
+    """
+    users = load_users()
+
+    for user in users:
+        if user['id'] == user_id:
+            logger.debug(f"Found user by ID: {user_id} ({user['email']})")
+            return user
+
+    logger.debug(f"User not found by ID: {user_id}")
+    return None

@@ -3,6 +3,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import hashlib
 import secrets
+import yaml
+from pathlib import Path
 
 
 class Database:
@@ -18,18 +20,7 @@ class Database:
         self.tokens: Dict[str, int] = {}  # token -> user_id
 
         # Store locations (store_id -> capital city)
-        self.stores: Dict[str, str] = {
-            "store-1": "London",
-            "store-2": "Paris",
-            "store-3": "Berlin",
-            "store-4": "Madrid",
-            "store-5": "Rome",
-            "store-6": "Amsterdam",
-            "store-7": "Vienna",
-            "store-8": "Brussels",
-            "store-9": "Copenhagen",
-            "store-10": "Stockholm"
-        }
+        self.stores: Dict[str, str] = {}
 
         # Counters for IDs
         self.next_book_id = 1
@@ -38,127 +29,67 @@ class Database:
         self.next_order_id = 1
         self.next_order_item_id = 1
 
-        # Initialize with sample data
-        self._seed_data()
+        # Load initial data from YAML file
+        self._load_initial_data()
 
-    def _seed_data(self):
-        """Seed database with sample books"""
-        sample_books = [
-            {
-                "title": "Clean Code",
-                "author": "Robert C. Martin",
-                "price": 45.00,
-                "description": "A Handbook of Agile Software Craftsmanship",
-                "category": "programming",
-                "stock_count": 12
-            },
-            {
-                "title": "Design Patterns",
-                "author": "Gang of Four",
-                "price": 52.00,
-                "description": "Elements of Reusable Object-Oriented Software",
-                "category": "programming",
-                "stock_count": 5
-            },
-            {
-                "title": "Refactoring",
-                "author": "Martin Fowler",
-                "price": 48.00,
-                "description": "Improving the Design of Existing Code",
-                "category": "programming",
-                "stock_count": 8
-            },
-            {
-                "title": "Code Complete",
-                "author": "Steve McConnell",
-                "price": 55.00,
-                "description": "A Practical Handbook of Software Construction",
-                "category": "programming",
-                "stock_count": 15
-            },
-            {
-                "title": "The Pragmatic Programmer",
-                "author": "Andrew Hunt & David Thomas",
-                "price": 43.00,
-                "description": "Your Journey to Mastery",
-                "category": "programming",
-                "stock_count": 8
-            },
-            {
-                "title": "Introduction to Algorithms",
-                "author": "CLRS",
-                "price": 85.00,
-                "description": "Third Edition",
-                "category": "algorithms",
-                "stock_count": 20
-            },
-            {
-                "title": "Cracking the Coding Interview",
-                "author": "Gayle Laakmann McDowell",
-                "price": 35.00,
-                "description": "189 Programming Questions and Solutions",
-                "category": "interview",
-                "stock_count": 25
-            },
-            {
-                "title": "System Design Interview",
-                "author": "Alex Xu",
-                "price": 42.00,
-                "description": "An Insider's Guide",
-                "category": "interview",
-                "stock_count": 18
-            },
-            {
-                "title": "Designing Data-Intensive Applications",
-                "author": "Martin Kleppmann",
-                "price": 58.00,
-                "description": "The Big Ideas Behind Reliable, Scalable Systems",
-                "category": "distributed-systems",
-                "stock_count": 10
-            },
-            {
-                "title": "The DevOps Handbook",
-                "author": "Gene Kim et al.",
-                "price": 38.00,
-                "description": "How to Create World-Class Agility, Reliability",
-                "category": "devops",
-                "stock_count": 14
-            },
-            {
-                "title": "Limited Edition: Site Reliability Engineering",
-                "author": "Google",
-                "price": 75.00,
-                "description": "How Google Runs Production Systems - Limited Edition",
-                "category": "devops",
-                "stock_count": 10
-            }
-        ]
+    def _load_initial_data(self):
+        """Load initial data from YAML files"""
+        current_file = Path(__file__)
+        base_path = current_file.parent.parent.parent
 
-        for book_data in sample_books:
-            book_id = self.next_book_id
-            self.books[book_id] = {
-                "id": book_id,
-                "title": book_data["title"],
-                "author": book_data["author"],
-                "price": book_data["price"],
-                "description": book_data["description"],
-                "category": book_data["category"],
-                "stock_count": book_data["stock_count"],
-                "created_at": datetime.utcnow()
-            }
-            self.next_book_id += 1
+        # Load stores and books from initial-data.yaml
+        yaml_file = base_path / "initial-data.yaml"
+        if not yaml_file.exists():
+            raise FileNotFoundError(f"Initial data file not found: {yaml_file}")
 
-        # Create a test user
-        test_user_id = self.next_user_id
-        password_hash = hashlib.sha256("password123".encode()).hexdigest()
-        self.users[test_user_id] = {
-            "id": test_user_id,
-            "email": "test@example.com",
-            "password_hash": password_hash,
-            "created_at": datetime.utcnow()
-        }
-        self.users_by_email["test@example.com"] = self.users[test_user_id]
-        self.next_user_id += 1
+        with open(yaml_file, 'r') as f:
+            data = yaml.safe_load(f)
+
+        # Load stores
+        if 'stores' in data:
+            self.stores = data['stores']
+
+        # Load books
+        if 'books' in data:
+            for book_data in data['books']:
+                book_id = self.next_book_id
+                self.books[book_id] = {
+                    "id": book_id,
+                    "title": book_data["title"],
+                    "author": book_data["author"],
+                    "price": book_data["price"],
+                    "description": book_data["description"],
+                    "category": book_data["category"],
+                    "stock_count": book_data["stock_count"],
+                    "created_at": datetime.utcnow()
+                }
+                self.next_book_id += 1
+
+        # Load users from users.yaml
+        users_file = base_path / "users.yaml"
+        if not users_file.exists():
+            raise FileNotFoundError(f"Users file not found: {users_file}")
+
+        with open(users_file, 'r') as f:
+            users_data = yaml.safe_load(f)
+
+        if 'users' in users_data:
+            max_user_id = 0
+            for user_data in users_data['users']:
+                # Use ID from YAML file
+                user_id = user_data["id"]
+                password_hash = hashlib.sha256(user_data["password"].encode()).hexdigest()
+                self.users[user_id] = {
+                    "id": user_id,
+                    "email": user_data["email"],
+                    "password_hash": password_hash,
+                    "created_at": datetime.utcnow()
+                }
+                self.users_by_email[user_data["email"]] = self.users[user_id]
+                max_user_id = max(max_user_id, user_id)
+
+            # Set next_user_id to one more than the highest ID from YAML
+            self.next_user_id = max_user_id + 1
 
     # Book operations
     def get_books(self, category: Optional[str] = None, search: Optional[str] = None) -> List[dict]:

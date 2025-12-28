@@ -1,8 +1,10 @@
 """Cart router - shopping cart operations"""
-from fastapi import APIRouter, HTTPException, Depends, status, Path
+from fastapi import APIRouter, HTTPException, Depends, status, Path, Request
 from storage.database import db
 from storage.models import CartItemCreate, CartResponse, CartItemResponse
 from dependencies import get_current_user
+from message.event_helper import publish_endpoint_event
+from message.events import ActionType
 
 router = APIRouter(
     prefix="/api/v1/{store_id}/cart",
@@ -13,6 +15,7 @@ router = APIRouter(
 
 @router.get("", response_model=CartResponse)
 async def get_cart(
+    request: Request,
     store_id: str = Path(..., description="Store ID"),
     current_user: dict = Depends(get_current_user)
 ):
@@ -49,6 +52,13 @@ async def get_cart(
     tax = subtotal * 0.08  # 8% tax
     total = subtotal + tax
 
+    # Publish event after successful operation
+    await publish_endpoint_event(
+        request=request,
+        action=ActionType.VIEW_CART,
+        user_id=current_user["id"]
+    )
+
     return CartResponse(
         items=items_response,
         total_items=len(items_response),
@@ -60,6 +70,7 @@ async def get_cart(
 
 @router.post("/items", status_code=status.HTTP_201_CREATED)
 async def add_to_cart(
+    request: Request,
     store_id: str,
     item: CartItemCreate,
     current_user: dict = Depends(get_current_user)
@@ -89,6 +100,17 @@ async def add_to_cart(
     # Add to cart
     cart_item = db.add_to_cart(current_user["id"], item.book_id, item.quantity)
 
+    # Publish event after successful operation
+    await publish_endpoint_event(
+        request=request,
+        action=ActionType.ADD_TO_CART,
+        user_id=current_user["id"],
+        data={
+            "book_id": item.book_id,
+            "quantity": item.quantity
+        }
+    )
+
     return {
         "message": "Item added to cart",
         "cart_item_id": cart_item["id"]
@@ -97,6 +119,7 @@ async def add_to_cart(
 
 @router.delete("/items/{cart_item_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_from_cart(
+    request: Request,
     store_id: str = Path(..., description="Store ID"),
     cart_item_id: int = Path(..., description="Cart item ID"),
     current_user: dict = Depends(get_current_user)
@@ -115,5 +138,13 @@ async def remove_from_cart(
     success = db.remove_from_cart(current_user["id"], cart_item_id)
     if not success:
         raise HTTPException(status_code=404, detail="Cart item not found")
+
+    # Publish event after successful operation
+    await publish_endpoint_event(
+        request=request,
+        action=ActionType.REMOVE_FROM_CART,
+        user_id=current_user["id"],
+        data={"cart_item_id": cart_item_id}
+    )
 
     return None
