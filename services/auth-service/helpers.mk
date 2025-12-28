@@ -17,6 +17,6 @@ lock-dependencies-auth-service: ## Generate Pipfile.lock using Docker
 		-v $(PWD)/$(AUTH_SERVICE_DIR):/app \
 		-w /app \
 		$(PYTHON_IMAGE) \
-		bash -c "pip install --quiet --root-user-action ignore pipenv && pipenv lock --verbose"
+		bash -c "pip install --quiet --root-user-action ignore pipenv && pipenv lock"
 	@echo "✓ Pipfile.lock generated successfully in $(AUTH_SERVICE_DIR)/"
 

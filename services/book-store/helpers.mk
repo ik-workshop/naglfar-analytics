@@ -17,7 +17,7 @@ lock-dependencies-book-store: ## Generate Pipfile.lock using Docker (no local Py
 		-v $(PWD)/$(BOOK_STORE_DIR):/app \
 		-w /app \
 		$(PYTHON_IMAGE) \
-		bash -c "pip install --quiet --root-user-action ignore pipenv && pipenv lock --verbose"
+		bash -c "pip install --quiet --root-user-action ignore pipenv && pipenv lock"
 	@echo "✓ Pipfile.lock generated successfully in $(BOOK_STORE_DIR)/"
 
 test-book-store: ## Run pytest tests in Docker for book-store service

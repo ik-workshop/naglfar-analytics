@@ -11,6 +11,7 @@ pydantic = {extras = ["email"], version = "*"}
 email-validator = "*"
 opentelemetry-instrumentation-fastapi = "*"
 python-multipart = "*"
+pyyaml = "*"
 
 [dev-packages]
 pytest = "*"
