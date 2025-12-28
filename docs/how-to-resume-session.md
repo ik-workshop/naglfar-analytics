@@ -133,6 +133,32 @@
 
 **Stores**: store-1 (London) through store-10 (Stockholm)
 
+### 4. **Naglfar Event Consumer** (.NET 10.0 Worker Service)
+**Location**: `services/naglfar-event-consumer/`
+
+**Responsibilities**:
+- Subscribe to Redis pub/sub channel (`naglfar-events`)
+- Process E-TOKEN generation events
+- Foundation for analytics pipeline
+- TODO: Store events in Neo4j, trigger analytics
+
+**Key Files**:
+- `src/NaglfartEventConsumer/Program.cs` - Entry point
+- `src/NaglfartEventConsumer/Services/RedisEventConsumer.cs` - Background service
+- `src/NaglfartEventConsumer/Models/NaglfartEvent.cs` - Generic event model
+- `tests/NaglfartEventConsumer.Tests/` - 11 passing tests
+
+**Configuration**:
+- `Redis:ConnectionString` - Redis connection (default: "localhost:6379")
+- `Redis:Channel` - Pub/sub channel (default: "naglfar-events")
+- `Redis:RetryDelaySeconds` - Retry delay on failure (default: "5")
+
+**Features**:
+- Generic event model (no schema changes for new fields)
+- Automatic reconnection on Redis failure
+- Graceful shutdown
+- Structured logging (Debug level in Development)
+
 ---
 
 ## Authentication System (CRITICAL)
@@ -480,6 +506,17 @@ echo "AUTH-TOKEN-ID: ${AUTH_TOKEN_ID}"
 ---
 
 ## Recent Changes Summary (Last Session)
+
+**2025-12-28**:
+1. ✅ Created Naglfar Event Consumer service (.NET 10.0 Worker Service)
+2. ✅ Implemented RedisEventConsumer background service with auto-retry
+3. ✅ Created generic NaglfartEvent model for flexible event handling
+4. ✅ Added Docker support with Alpine Linux
+5. ✅ Integrated event consumer into docker-compose.yml
+6. ✅ Created 11 unit tests (all passing)
+7. ✅ Added Makefile commands (helpers.mk)
+8. ✅ Comprehensive documentation (README.md)
+9. ✅ Updated CHANGELOG.md and how-to-resume-session.md
 
 **2025-12-27**:
 1. ✅ Implemented AUTH-TOKEN signature validation (HMAC-SHA256)

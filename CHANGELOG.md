@@ -1,7 +1,7 @@
 # Naglfar Analytics - Changelog & Analysis
 
 > **Note**: This file is automatically updated whenever the project changes.
-> Last Updated: 2025-12-27
+> Last Updated: 2025-12-28
 
 ---
 
@@ -20,7 +20,7 @@
 ## Current State Analysis
 
 ### Overview
-A lightweight .NET web application providing **health monitoring and analytics capabilities** with standardized health check endpoints for container orchestration and service mesh integration.
+A multi-service authentication and analytics platform providing **event-driven architecture** with Redis pub/sub for processing authentication events and building analytics capabilities.
 
 ### Technology Stack
 - **Framework**: .NET 10.0 (latest)
@@ -90,6 +90,161 @@ A lightweight .NET web application providing **health monitoring and analytics c
 ---
 
 ## Changelog
+
+### 2025-12-28 - Redis Event Consumer Service Implementation
+
+#### Added
+- **✅ Naglfar Event Consumer Service** (`services/naglfar-event-consumer/`):
+  - **Technology**: .NET 10.0 Worker Service
+  - **Purpose**: Background service to consume and process E-TOKEN events from Redis pub/sub
+  - **Dependencies**:
+    - StackExchange.Redis 2.10.1
+    - Microsoft.Extensions.Diagnostics.HealthChecks 10.0.1
+    - Microsoft.Extensions.Hosting 10.0.1
+
+- **✅ RedisEventConsumer Background Service** (`Services/RedisEventConsumer.cs`):
+  - Subscribes to `naglfar-events` Redis pub/sub channel
+  - Automatic connection retry with configurable delay
+  - Graceful shutdown with proper cleanup
+  - Structured logging for all operations
+  - Error handling without service crashes
+  - Connection keep-alive mechanism
+
+- **✅ Generic Event Model** (`Models/NaglfartEvent.cs`):
+  - Flexible dictionary-based property storage
+  - Type-safe property accessors (GetString, GetInt, GetDateTime)
+  - Future-proof design for adding new event fields
+  - No schema changes required for new properties
+
+- **✅ Configuration Support**:
+  - `appsettings.json` - Production settings
+  - `appsettings.Development.json` - Development settings with debug logging
+  - Redis connection string configuration
+  - Channel name configuration
+  - Retry delay configuration
+  - Environment variable override support (Redis__ConnectionString, etc.)
+
+- **✅ Docker Support**:
+  - Multi-stage Dockerfile using Alpine Linux
+  - Runtime-only image (not aspnet, since it's a worker)
+  - Health check using process monitoring
+  - Optimized build with PublishReadyToRun
+  - Production-ready container configuration
+
+- **✅ Docker Compose Integration** (`infrastructure/docker-compose.yml`):
+  - Added `naglfar-event-consumer` service
+  - Depends on Redis service
+  - Connected to naglfar-network
+  - Environment variables for Redis connection
+  - Automatic restart on failure
+
+- **✅ Comprehensive Unit Tests** (`tests/NaglfartEventConsumer.Tests/`):
+  - 11 unit tests, all passing
+  - NaglfartEventTests.cs - Tests for generic event model
+  - Test coverage for:
+    - String property access
+    - Integer property access
+    - DateTime property parsing
+    - Property existence checks
+    - Complete E-TOKEN event deserialization
+  - Uses xUnit, Moq, and Microsoft.Extensions.Configuration.Abstractions
+
+- **✅ Makefile Commands** (`helpers.mk`):
+  - `make docker-build-event-consumer` - Build Docker image
+  - `make docker-run-event-consumer` - Run standalone container
+  - `make docker-stop-event-consumer` - Stop and remove container
+  - `make docker-clean-event-consumer` - Remove Docker image
+  - `make compose-rebuild-event-consumer` - Rebuild via docker-compose
+  - `make test-event-consumer` - Run unit tests
+
+- **✅ Comprehensive Documentation** (`services/naglfar-event-consumer/README.md`):
+  - Service overview and features
+  - Event format documentation
+  - Configuration guide
+  - Local development instructions
+  - Docker usage guide
+  - Architecture diagram
+  - Logging examples
+  - Error handling documentation
+  - Testing guide
+  - Future enhancements roadmap
+
+#### Technical Details
+
+**Event Processing Flow**:
+1. Service starts and connects to Redis using configured connection string
+2. Subscribes to `naglfar-events` channel
+3. On message received:
+   - Deserializes JSON to generic event model
+   - Extracts properties (client_ip, store_id, action, timestamp)
+   - Logs event details
+   - TODO: Process event (store in Neo4j, trigger analytics, etc.)
+4. On connection failure:
+   - Logs error
+   - Disposes connection
+   - Waits configured retry delay
+   - Reconnects automatically
+5. On shutdown:
+   - Unsubscribes from channel
+   - Disposes Redis connection
+   - Logs shutdown message
+
+**Project Structure**:
+```
+services/naglfar-event-consumer/
+├── src/
+│   └── NaglfartEventConsumer/
+│       ├── Program.cs                    # Entry point, service registration
+│       ├── Services/
+│       │   └── RedisEventConsumer.cs     # Background service implementation
+│       ├── Models/
+│       │   └── NaglfartEvent.cs          # Generic event model
+│       ├── appsettings.json              # Production config
+│       ├── appsettings.Development.json  # Development config
+│       └── NaglfartEventConsumer.csproj  # Project file
+├── tests/
+│   └── NaglfartEventConsumer.Tests/
+│       ├── Models/
+│       │   └── NaglfartEventTests.cs     # Unit tests for event model
+│       └── NaglfartEventConsumer.Tests.csproj
+├── Dockerfile                             # Multi-stage Docker build
+├── helpers.mk                             # Makefile commands
+└── README.md                              # Service documentation
+```
+
+**Why This Implementation**:
+- **Generic Event Model**: Allows adding new event fields without code changes
+- **Worker Service**: Designed for long-running background tasks
+- **Auto-Retry**: Resilient to Redis outages
+- **Alpine Linux**: Minimal Docker image size
+- **Structured Logging**: Easy debugging and monitoring
+- **Testable**: Dependency injection and unit tests
+
+#### Files Modified
+- `infrastructure/docker-compose.yml` - Added naglfar-event-consumer service (lines 88-102)
+- `CHANGELOG.md` - This file (Current State Analysis updated)
+
+#### Files Added
+- `services/naglfar-event-consumer/src/NaglfartEventConsumer/Program.cs`
+- `services/naglfar-event-consumer/src/NaglfartEventConsumer/Services/RedisEventConsumer.cs`
+- `services/naglfar-event-consumer/src/NaglfartEventConsumer/Models/NaglfartEvent.cs`
+- `services/naglfar-event-consumer/src/NaglfartEventConsumer/appsettings.json`
+- `services/naglfar-event-consumer/src/NaglfartEventConsumer/appsettings.Development.json`
+- `services/naglfar-event-consumer/src/NaglfartEventConsumer/NaglfartEventConsumer.csproj`
+- `services/naglfar-event-consumer/tests/NaglfartEventConsumer.Tests/Models/NaglfartEventTests.cs`
+- `services/naglfar-event-consumer/tests/NaglfartEventConsumer.Tests/NaglfartEventConsumer.Tests.csproj`
+- `services/naglfar-event-consumer/Dockerfile`
+- `services/naglfar-event-consumer/helpers.mk`
+- `services/naglfar-event-consumer/README.md`
+
+#### Test Results
+```
+Passed!  - Failed: 0, Passed: 11, Skipped: 0, Total: 11
+```
+
+All unit tests passing for the event consumer service.
+
+---
 
 ### 2025-12-27 - AUTH-TOKEN-ID Tracking & Manual Token Generation
 

@@ -3,7 +3,7 @@
 > **Core Purpose**: Abuse protection layer that shields backend services from malicious traffic and attack patterns.
 
 **Document Status**: Draft
-**Last Updated**: 2025-12-27
+**Last Updated**: 2025-12-28
 **Version**: 0.1.0
 
 ---
@@ -281,10 +281,11 @@ Naglfar stores/processes:
 - API versioning (v1)
 - Integration tests (33 tests passing)
 - Docker + Docker Compose deployment
+- Redis event consumer service (.NET 10.0 Worker Service, 11 tests passing)
 
 #### 🔄 In Progress
-- Redis event consumer/analytics (subscriber to naglfar-events channel)
 - Login/register UI form (currently auto-authenticates)
+- Event analytics processing (store events in Neo4j)
 - Threat detection algorithms
 - Rate limiting implementation
 - Account compromise detection

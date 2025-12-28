@@ -84,6 +84,23 @@ services:
       - "traefik.http.routers.auth-service.entrypoints=web"
       - "traefik.http.routers.auth-service.service=auth-service"
       - "traefik.http.services.auth-service.loadbalancer.server.port=8000"
+
+  naglfar-event-consumer:
+    build:
+      context: ../services/naglfar-event-consumer
+      dockerfile: Dockerfile
+    container_name: naglfar-event-consumer
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - Redis__ConnectionString=redis:6379
+      - Redis__Channel=naglfar-events
+      - Redis__RetryDelaySeconds=5
+    restart: unless-stopped
+    networks:
+      - naglfar-network
+    depends_on:
+      - redis
+
   redis:
     image: "redis:8"
     container_name: redis
