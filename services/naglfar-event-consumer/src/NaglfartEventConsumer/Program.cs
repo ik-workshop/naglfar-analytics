@@ -14,6 +14,9 @@ builder.WebHost.ConfigureKestrel(options =>
 builder.Services.AddHealthChecks()
     .AddCheck("redis_event_consumer", () => HealthCheckResult.Healthy("Redis Event Consumer is running"));
 
+// Register Neo4j service as singleton
+builder.Services.AddSingleton<Neo4jService>();
+
 // Register the Redis Event Consumer background service
 builder.Services.AddHostedService<RedisEventConsumer>();
 

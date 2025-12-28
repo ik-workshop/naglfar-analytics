@@ -104,6 +104,13 @@ services:
       - Redis__ConnectionString=redis:6379
       - Redis__Channel=naglfar-events
       - Redis__RetryDelaySeconds=5
+      # Neo4j Configuration
+      - Neo4j__Uri=bolt://neo4j:7687
+      - Neo4j__Username=neo4j
+      - Neo4j__Password=naglfar123
+      # Batch Processing Configuration
+      - Batch__Size=50
+      - Batch__FlushIntervalSeconds=5
       # Logging Configuration
       - Logging__LogLevel__Default=Information
       - Logging__LogLevel__NaglfartEventConsumer=Error
@@ -113,6 +120,7 @@ services:
       - naglfar-network
     depends_on:
       - redis
+      - neo4j
     labels:
       - "traefik.enable=false"
 
@@ -156,6 +164,41 @@ services:
     #   redis:
     #     condition: service_healthy
 
+  neo4j:
+    image: "neo4j:5.9"
+    container_name: neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    networks:
+      - naglfar-network
+    environment:
+      # Authentication
+      - NEO4J_AUTH=neo4j/naglfar123
+      # Memory Configuration
+      - NEO4J_server_memory_pagecache_size=512M
+      - NEO4J_server_memory_heap_initial__size=512M
+      - NEO4J_server_memory_heap_max__size=1G
+      # Database Configuration
+      - NEO4J_db_tx__log_rotation_retention__policy=100M size
+      # APOC Configuration (Advanced Procedures)
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_security_procedures_allowlist=apoc.*
+      # Logging
+      - NEO4J_server_logs_debug_level=INFO
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+      - neo4j-import:/var/lib/neo4j/import
+      - neo4j-plugins:/plugins
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
 networks:
   naglfar-network:
     driver: bridge
@@ -168,4 +211,12 @@ volumes:
   redis-data:
     driver: local
   redisinsight-data:
+    driver: local
+  neo4j-data:
+    driver: local
+  neo4j-logs:
+    driver: local
+  neo4j-import:
+    driver: local
+  neo4j-plugins:
     driver: local

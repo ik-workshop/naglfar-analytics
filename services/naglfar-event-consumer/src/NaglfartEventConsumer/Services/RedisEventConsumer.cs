@@ -12,15 +12,18 @@ public class RedisEventConsumer : BackgroundService
 {
     private readonly ILogger<RedisEventConsumer> _logger;
     private readonly IConfiguration _configuration;
+    private readonly Neo4jService _neo4jService;
     private IConnectionMultiplexer? _redis;
     private ISubscriber? _subscriber;
 
     public RedisEventConsumer(
         ILogger<RedisEventConsumer> logger,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        Neo4jService neo4jService)
     {
         _logger = logger;
         _configuration = configuration;
+        _neo4jService = neo4jService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -32,6 +35,13 @@ public class RedisEventConsumer : BackgroundService
         _logger.LogInformation(
             "Starting Redis Event Consumer: ConnectionString={ConnectionString}, Channel={Channel}",
             redisConnectionString, channel);
+
+        // Verify Neo4j connectivity on startup
+        var neo4jConnected = await _neo4jService.VerifyConnectivityAsync();
+        if (!neo4jConnected)
+        {
+            _logger.LogWarning("Neo4j is not available. Events will be processed but not stored in graph database.");
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -153,12 +163,16 @@ public class RedisEventConsumer : BackgroundService
                 category, action, sessionId, storeId ?? "null", userId?.ToString() ?? "null",
                 authTokenId ?? "null", timestamp?.ToString("o") ?? "null");
 
-            // TODO: Add business logic here
-            // - Store events in database (Neo4j, etc.)
-            // - Trigger analytics pipelines
-            // - Update user journey tracking
-            // - Calculate metrics and KPIs
-            await Task.CompletedTask;
+            // Store event in Neo4j graph database
+            try
+            {
+                await _neo4jService.StoreEventAsync(naglfartEvent, category);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to store event in Neo4j, continuing processing");
+                // Don't throw - we want to continue processing other events
+            }
 
             // Record success metrics
             EventMetrics.EventsProcessed

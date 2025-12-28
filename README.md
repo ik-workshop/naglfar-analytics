@@ -357,6 +357,7 @@ These endpoints are commonly used by:
 - [Dapr](https://dapr.io/)
 - [Redis](https://redis.io/)
 - [Redis mod](https://hub.docker.com/r/redislabs/redismod)
+- [Neo4J Driver](https://neo4j.com/docs/dotnet-manual/current/)
 
 ## License
 
