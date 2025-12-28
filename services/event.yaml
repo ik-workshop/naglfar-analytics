@@ -99,12 +99,53 @@ event_categories:
             - action
             - timestamp
             - auth_token_id
+            - ip_address
+            - user_agent
+            - location
           optional_fields:
             - user_id
             - data
           data_schema:
             e_token_expiry: "string - E-TOKEN expiration timestamp"
             return_url: "string - Original URL user was accessing"
+
+      - e_token_created:
+          description: "E_TOKEN created in naglfar-validation"
+          required_fields:
+            - store_id
+            - action
+            - timestamp
+            - auth_token_id
+            - client_ip
+            - user_agent
+            - location
+            - path
+            - query
+          optional_fields:
+            - user_id
+            - data
+          data_schema:
+            e_token_expiry: "string - E-TOKEN expiration timestamp"
+            return_url: "string - Original URL user was accessing"
+
+      - auth_token_validated:
+          description: "AUTH_TOKEN validated in naglfar-validation"
+          required_fields:
+            - store_id
+            - session_id
+            - action
+            - status
+            - timestamp
+            - auth_token_id
+            - client_ip
+            - user_agent
+            - location
+            - path
+            - query
+          optional_fields:
+            - session_id
+            - user_id
+            - data
 
       - auth_token_generation:
           description: "AUTH-TOKEN generation (auth-service)"

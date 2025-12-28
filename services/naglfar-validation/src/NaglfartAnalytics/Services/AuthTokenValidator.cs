@@ -43,7 +43,7 @@ public class AuthTokenValidator
             tokenData = JsonSerializer.Deserialize<AuthTokenData>(decodedJson);
             if (tokenData == null)
             {
-                _logger.LogWarning("AUTH-TOKEN JSON deserialization returned null");
+                _logger.LogWarning("AUTH_TOKEN JSON deserialization returned null");
                 return false;
             }
 
@@ -52,20 +52,20 @@ public class AuthTokenValidator
                 string.IsNullOrEmpty(tokenData.ExpiredAt) ||
                 string.IsNullOrEmpty(tokenData.Signature))
             {
-                _logger.LogWarning("AUTH-TOKEN missing required fields");
+                _logger.LogWarning("AUTH_TOKEN missing required fields");
                 return false;
             }
 
             // Check expiration
             if (!DateTime.TryParse(tokenData.ExpiredAt, out var expiredAt))
             {
-                _logger.LogWarning("AUTH-TOKEN has invalid expired_at format: {ExpiredAt}", tokenData.ExpiredAt);
+                _logger.LogWarning("AUTH_TOKEN has invalid expired_at format: {ExpiredAt}", tokenData.ExpiredAt);
                 return false;
             }
 
             if (expiredAt < DateTime.UtcNow)
             {
-                _logger.LogWarning("AUTH-TOKEN expired at {ExpiredAt}, current time {Now}", expiredAt, DateTime.UtcNow);
+                _logger.LogWarning("AUTH_TOKEN expired at {ExpiredAt}, current time {Now}", expiredAt, DateTime.UtcNow);
                 return false;
             }
 

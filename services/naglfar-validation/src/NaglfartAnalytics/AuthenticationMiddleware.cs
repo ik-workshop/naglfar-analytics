@@ -42,6 +42,16 @@ public class AuthenticationMiddleware
 
         if (!string.IsNullOrEmpty(authToken))
         {
+            // Extract context for event publishing
+            var sessionId = context.Request.Headers["SESSION-ID"].FirstOrDefault() ?? Guid.NewGuid().ToString();
+            var clientIp = context.Request.Headers["CLIENT_IP"].FirstOrDefault()
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown";
+            var userAgent = context.Request.Headers["User-Agent"].FirstOrDefault() ?? "unknown";
+            var location = $"{context.Request.Path}{context.Request.QueryString}";
+            var requestPath = context.Request.Path.Value ?? "/";
+            var queryString = context.Request.QueryString.Value ?? "";
+
             // Validate AUTH-TOKEN signature
             if (authTokenValidator.ValidateAuthToken(authToken, storeId, out var tokenData))
             {
@@ -52,10 +62,36 @@ public class AuthenticationMiddleware
                 _logger.LogInformation("Authenticated user {UserId} for store {StoreId}",
                     tokenData.UserId, tokenData.StoreId);
 
+                // Publish auth_token_validated event with status=pass
+                await redisPublisher.PublishAuthTokenValidatedEventAsync(
+                    storeId: storeId,
+                    sessionId: sessionId,
+                    authTokenId: authToken,
+                    status: "pass",
+                    clientIp: clientIp,
+                    userAgent: userAgent,
+                    location: location,
+                    path: requestPath,
+                    query: queryString,
+                    userId: tokenData.UserId);
+
                 // Continue with authenticated request
                 await _next(context);
                 return;
             }
+
+            // Invalid token - publish event with status=fail
+            await redisPublisher.PublishAuthTokenValidatedEventAsync(
+                storeId: storeId,
+                sessionId: sessionId,
+                authTokenId: authToken,
+                status: "fail",
+                clientIp: clientIp,
+                userAgent: userAgent,
+                location: location,
+                path: requestPath,
+                query: queryString,
+                userId: null);
 
             // Invalid token - treat as unauthenticated and generate new E-TOKEN
             _logger.LogWarning("Invalid AUTH-TOKEN provided, generating new E-TOKEN");
@@ -87,12 +123,31 @@ public class AuthenticationMiddleware
                 ?? context.Connection.RemoteIpAddress?.ToString()
                 ?? "unknown";
 
-            // Publish E-TOKEN event to Redis
-            await redisPublisher.PublishETokenEventAsync(clientIp, storeId, "e-token");
+            // Extract user agent
+            var userAgent = context.Request.Headers["User-Agent"].FirstOrDefault() ?? "unknown";
+
+            // Get location (full path with query)
+            var location = $"{context.Request.Path}{context.Request.QueryString}";
+
+            // Get path and query separately
+            var requestPath = context.Request.Path.Value ?? "/";
+            var queryString = context.Request.QueryString.Value ?? "";
 
             // Redirect to auth-service
             var authServiceUrl = _configuration["Authentication:AuthServiceUrl"] ?? "http://localhost:8090/auth";
             var returnUrl = $"{context.Request.Scheme}://{context.Request.Host}{context.Request.Path}{context.Request.QueryString}";
+
+            // Publish E-TOKEN creation event to Redis
+            await redisPublisher.PublishETokenEventAsync(
+                storeId: storeId,
+                authTokenId: eToken,
+                clientIp: clientIp,
+                userAgent: userAgent,
+                location: location,
+                path: requestPath,
+                query: queryString,
+                eTokenExpiry: eTokenData.expiry_date,
+                returnUrl: returnUrl);
 
             var redirectUrl = $"{authServiceUrl}?return_url={Uri.EscapeDataString(returnUrl)}&e_token={Uri.EscapeDataString(eToken)}";
 
