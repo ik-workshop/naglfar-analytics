@@ -14,9 +14,9 @@ flowchart TD
 
     AuthCheck -->|No| ExtractData[Extract Data:<br/>- store_id from path<br/>- CLIENT_IP from header]
 
-    ExtractData --> GenerateEToken[Generate New E-TOKEN<br/>Base64 JSON:<br/>{expiry_date, store_id}]
+    ExtractData --> GenerateEToken[Generate New E-TOKEN<br/>Base64 JSON:<br/>expiry_date, store_id]
 
-    GenerateEToken --> PublishRedis[Publish to Redis<br/>Channel: naglfar-events<br/>{client_ip, store_id, action: e-token}]
+    GenerateEToken --> PublishRedis[Publish to Redis<br/>Channel: naglfar-events<br/>client_ip, store_id, action: e-token]
 
     PublishRedis --> SetHeader[Set E-TOKEN Header]
     SetHeader --> Redirect[302 Redirect to Auth Service]
