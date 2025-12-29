@@ -10,7 +10,8 @@ MERMAID_CLI_IMAGE := minlag/mermaid-cli:$(MERMAID_CLI_VERSION)
 
 .PHONY: help
 help:
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo "Available targets:"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
 
 -include infrastructure/helpers.mk
 -include services/book-store/helpers.mk
