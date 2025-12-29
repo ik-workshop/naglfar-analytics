@@ -7,11 +7,40 @@ version: "2.0"
 description: "Event-centric graph model for abuse detection. Entities are identity nodes, Events contain all data."
 
 design_philosophy:
-  principle: "Entities are identity containers. Events contain all data. Abuse detection happens through Event queries."
+  principle: "Pure event-centric model. Entities are identity containers. Events contain all data. Abuse detection happens through Event queries."
+
   entity_role: "Minimal nodes representing identity (IP, Session, User, Store)"
-  event_role: "Rich nodes containing all request/event data"
-  relationship_role: "Connect Events to Entities for querying"
-  abuse_detection: "Query Event patterns, not entity properties"
+  entity_properties: "Only ID and timestamps - no business data, no behavioral data"
+
+  event_role: "Rich nodes containing all request/event data including context"
+  event_properties: "All business data, user context, request details, temporal information"
+
+  relationship_strategy: "All relationships go Event → Entity (never Entity → Entity)"
+  relationship_role: "Connect Events to Entities for querying and grouping"
+
+  abuse_detection: "Query Event patterns and relationships, not entity properties"
+  temporal_queries: "All time-based analysis uses Event timestamps and relationships"
+
+design_decisions:
+  no_direct_entity_relationships:
+    decision: "No User → Session, User → Store, or IPAddress → Session relationships"
+    reason: "Direct relationships lose temporal context - we need to know WHEN relationships occurred"
+    example: "To detect 'IP used by multiple users in last hour' we need Event timestamps, not static relationships"
+
+  no_entity_business_data:
+    decision: "Entities don't store email, user_agent, device_type, or other business data"
+    reason: "Events are the source of truth. Entity data can change over time and should be queried from Events"
+    example: "User email stored in Events, not User node. Query most recent Event for current email"
+
+  event_denormalization:
+    decision: "Events denormalize identity fields (client_ip, user_id, session_id, store_id)"
+    reason: "Fast queries without joins. Events are immutable so denormalization is safe"
+    example: "Event contains client_ip field AND relationship to IPAddress node"
+
+  entity_lifecycle:
+    decision: "Entities are created on first Event, updated (timestamps) on subsequent Events"
+    reason: "Entities represent 'existence' while Events represent 'activity'"
+    example: "Session created when first Event with session_id arrives, last_activity updated on each Event"
 
 # ==============================================================================
 # ENTITY DEFINITIONS
@@ -521,13 +550,90 @@ data_flow:
     event_handling: "CREATE (always new)"
 
 # ==============================================================================
+# EXAMPLE: WHY PURE EVENT-CENTRIC MODEL
+# ==============================================================================
+
+example_queries:
+  why_no_direct_relationships:
+    description: "Shows why we don't create User → Session or IPAddress → Session relationships"
+
+    wrong_approach_with_direct_relationships: |
+      # ❌ WRONG: With direct User → Session relationships
+      MATCH (u:User)-[:HAS_SESSION]->(s:Session)
+      WHERE u.user_id = 1001
+      RETURN s.session_id
+
+      # Problem: Lost temporal context
+      # - Can't answer "When did user use this session?"
+      # - Can't answer "Which events happened in this session?"
+      # - Can't detect session sharing in specific time window
+
+    correct_approach_event_centric: |
+      # ✅ CORRECT: Query through Events
+      MATCH (e:Event)-[:PERFORMED_BY]->(u:User {user_id: 1001})
+      MATCH (e)-[:IN_SESSION]->(s:Session)
+      WHERE e.timestamp > datetime() - duration('PT24H')
+      RETURN DISTINCT s.session_id, min(e.timestamp) as first_use, max(e.timestamp) as last_use
+
+      # Benefits:
+      # - Temporal context preserved (when user used session)
+      # - Can filter by time window
+      # - Can see what events happened
+      # - Can detect abuse patterns
+
+  session_sharing_detection: |
+    # Detect sessions used by multiple users (temporal context needed)
+    MATCH (e:Event)-[:IN_SESSION]->(s:Session)
+    WHERE e.user_id IS NOT NULL
+      AND e.timestamp > datetime() - duration('PT1H')  # Last hour only
+    WITH s.session_id as session_id,
+         collect(DISTINCT e.user_id) as user_ids,
+         min(e.timestamp) as first_event,
+         max(e.timestamp) as last_event
+    WHERE size(user_ids) > 1
+    RETURN session_id, user_ids, first_event, last_event
+
+    # This query would be IMPOSSIBLE with static User → Session relationships
+    # because we need to know WHEN the sharing occurred
+
+  ip_behavior_temporal: |
+    # Detect IPs used by multiple users in specific time window
+    MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress)
+    WHERE e.user_id IS NOT NULL
+      AND e.timestamp > datetime() - duration('PT1H')  # Critical: time window
+    WITH ip.address as ip_address,
+         collect(DISTINCT e.user_id) as user_ids,
+         count(e) as event_count
+    WHERE size(user_ids) > 5
+    RETURN ip_address, user_ids, event_count
+
+    # Static IPAddress → User relationships would show ALL users EVER
+    # Event-centric approach shows users in SPECIFIC TIME WINDOW
+
+  user_email_lookup: |
+    # Get user's current email (most recent Event)
+    MATCH (e:Event)-[:PERFORMED_BY]->(u:User {user_id: 1001})
+    WHERE e.user_email IS NOT NULL
+    RETURN e.user_email as current_email
+    ORDER BY e.timestamp DESC
+    LIMIT 1
+
+    # Email changes over time - stored in Events, not User node
+    # User node is just identity container (user_id)
+
+# ==============================================================================
 # NOTES
 # ==============================================================================
 
 notes:
-  - "This is version 2.0 - simplified event-centric model"
+  - "This is version 2.0 - PURE event-centric model"
   - "Version 1.0 (archived) had entity counters and abuse state - now removed"
   - "All abuse detection happens through Event queries"
-  - "Entities are minimal identity nodes only"
+  - "Entities are minimal identity nodes only (ID + timestamps)"
+  - "NO direct entity-to-entity relationships (User → Session, User → Store, etc.)"
+  - "ALL relationships go through Events to preserve temporal context"
+  - "Business data (email, user_agent, device_type) stored in Events, NOT entities"
+  - "Events denormalize identity fields for fast queries"
   - "Event nodes can be pruned/archived over time"
   - "Single source of truth: Event nodes"
+  - "Design decision: Keep pure event-centric to maintain temporal context for abuse detection"

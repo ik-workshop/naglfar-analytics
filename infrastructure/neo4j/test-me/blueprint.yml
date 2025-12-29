@@ -1,0 +1,281 @@
+  -
+
+    1 name: "Brute Force Attack - Blueprint"
+    2 description: "Demonstrates abuse detection pattern: Multiple failed authentication attempts from same IP address"
+    3
+    4 # Attack configuration
+    5 config:
+    6   base_url: "${BASE_URL:-http://localhost}"
+    7   store_id: "store-1"
+    8   attacker_ip: "203.0.113.45"  # Suspicious IP
+    9   user_agent: "Python-Requests/2.28.1"  # Bot user agent
+   10   device_type: "web"
+   11   attack_duration_seconds: 30
+   12   attempts: 20  # Number of failed auth attempts
+   13   delay_ms: 500  # Delay between attempts (milliseconds)
+   14   verbose: false
+   15
+   16 # Attack metadata (for Neo4j analysis)
+   17 metadata:
+   18   attack_type: "brute_force"
+   19   severity: "high"
+   20   expected_detections:
+   21     - "IP with excessive failed auth attempts"
+   22     - "Bot user agent pattern"
+   23     - "Rapid sequential requests from same IP"
+   24     - "Failed auth events clustered in time"
+   25
+   26 # Attack steps
+   27 steps:
+   28   # Step 1: Initial reconnaissance - Get E-TOKEN
+   29   - name: "Reconnaissance: Request E-TOKEN"
+   30     request:
+   31       method: GET
+   32       path: "/api/v1/{store_id}/auth/login"
+   33       headers:
+   34         Host: "api.local"
+   35         User-Agent: "{user_agent}"
+   36         X-Forwarded-For: "{attacker_ip}"
+   37     expect:
+   38       status: 200
+   39       headers:
+   40         - name: "E-TOKEN"
+   41           save_as: "e_token"
+   42         - name: "E-TOKEN-ID"
+   43           save_as: "e_token_id"
+   44     metadata:
+   45       event_action: "e_token_created"
+   46       event_status: null
+   47       abuse_indicator: "reconnaissance"
+   48     description: "Attacker gets E-TOKEN for subsequent auth attempts"
+   49
+   50   # Step 2-N: Brute force attempts with different credentials
+   51   - name: "Brute Force Attempt 1"
+   52     request:
+   53       method: POST
+   54       path: "/api/v1/auth/validate"
+   55       headers:
+   56         Host: "api.local"
+   57         User-Agent: "{user_agent}"
+   58         X-Forwarded-For: "{attacker_ip}"
+   59         E-TOKEN: "{e_token}"
+   60         E-TOKEN-ID: "{e_token_id}"
+   61         Content-Type: "application/json"
+   62       body:
+   63         username: "admin"
+   64         password: "password123"
+   65         store_id: "{store_id}"
+   66     expect:
+   67       status: 401  # Expecting failure
+   68     metadata:
+   69       event_action: "auth_token_validated"
+   70       event_status: "fail"
+   71       abuse_indicator: "failed_auth"
+   72       credential_pair: "admin:password123"
+   73     delay_ms: "{delay_ms}"
+   74     description: "Failed auth attempt #1"
+   75
+   76   - name: "Brute Force Attempt 2"
+   77     request:
+   78       method: POST
+   79       path: "/api/v1/auth/validate"
+   80       headers:
+   81         Host: "api.local"
+   82         User-Agent: "{user_agent}"
+   83         X-Forwarded-For: "{attacker_ip}"
+   84         E-TOKEN: "{e_token}"
+   85         E-TOKEN-ID: "{e_token_id}"
+   86         Content-Type: "application/json"
+   87       body:
+   88         username: "admin"
+   89         password: "admin123"
+   90         store_id: "{store_id}"
+   91     expect:
+   92       status: 401
+   93     metadata:
+   94       event_action: "auth_token_validated"
+   95       event_status: "fail"
+   96       abuse_indicator: "failed_auth"
+   97       credential_pair: "admin:admin123"
+   98     delay_ms: "{delay_ms}"
+   99     description: "Failed auth attempt #2"
+  100
+  101   - name: "Brute Force Attempt 3"
+  102     request:
+  103       method: POST
+  104       path: "/api/v1/auth/validate"
+  105       headers:
+  106         Host: "api.local"
+  107         User-Agent: "{user_agent}"
+  108         X-Forwarded-For: "{attacker_ip}"
+  109         E-TOKEN: "{e_token}"
+  110         E-TOKEN-ID: "{e_token_id}"
+  111         Content-Type: "application/json"
+  112       body:
+  113         username: "root"
+  114         password: "toor"
+  115         store_id: "{store_id}"
+  116     expect:
+  117       status: 401
+  118     metadata:
+  119       event_action: "auth_token_validated"
+  120       event_status: "fail"
+  121       abuse_indicator: "failed_auth"
+  122       credential_pair: "root:toor"
+  123     delay_ms: "{delay_ms}"
+  124     description: "Failed auth attempt #3"
+  125
+  126   - name: "Brute Force Attempt 4"
+  127     request:
+  128       method: POST
+  129       path: "/api/v1/auth/validate"
+  130       headers:
+  131         Host: "api.local"
+  132         User-Agent: "{user_agent}"
+  133         X-Forwarded-For: "{attacker_ip}"
+  134         E-TOKEN: "{e_token}"
+  135         E-TOKEN-ID: "{e_token_id}"
+  136         Content-Type: "application/json"
+  137       body:
+  138         username: "administrator"
+  139         password: "admin"
+  140         store_id: "{store_id}"
+  141     expect:
+  142       status: 401
+  143     metadata:
+  144       event_action: "auth_token_validated"
+  145       event_status: "fail"
+  146       abuse_indicator: "failed_auth"
+  147       credential_pair: "administrator:admin"
+  148     delay_ms: "{delay_ms}"
+  149     description: "Failed auth attempt #4"
+  150
+  151   - name: "Brute Force Attempt 5"
+  152     request:
+  153       method: POST
+  154       path: "/api/v1/auth/validate"
+  155       headers:
+  156         Host: "api.local"
+  157         User-Agent: "{user_agent}"
+  158         X-Forwarded-For: "{attacker_ip}"
+  159         E-TOKEN: "{e_token}"
+  160         E-TOKEN-ID: "{e_token_id}"
+  161         Content-Type: "application/json"
+  162       body:
+  163         username: "admin"
+  164         password: "12345678"
+  165         store_id: "{store_id}"
+  166     expect:
+  167       status: 401
+  168     metadata:
+  169       event_action: "auth_token_validated"
+  170       event_status: "fail"
+  171       abuse_indicator: "failed_auth"
+  172       credential_pair: "admin:12345678"
+  173     delay_ms: "{delay_ms}"
+  174     description: "Failed auth attempt #5"
+  175
+  176   # Continue pattern for remaining attempts...
+  177   # Note: In actual implementation, these would be loop-generated
+  178   # For blueprint purposes, showing 5 examples is sufficient
+  179
+  180 # Abuse detection assertions (what Neo4j queries should find)
+  181 abuse_assertions:
+  182   - query: "MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress {address: '203.0.113.45'}) WHERE e.action = 'auth_token_validated' AND e.status = 'fail' AND e.timesta
+      mp > datetime() - duration('PT5M') RETURN count(e) as failed_count"
+  183     expected: ">= 5"
+  184     description: "Should detect multiple failed auth attempts from same IP"
+  185
+  186   - query: "MATCH (ip:IPAddress {address: '203.0.113.45'}) RETURN ip.address, ip.last_seen"
+  187     expected: "exists"
+  188     description: "IPAddress node should be created and tracked"
+  189
+  190   - query: "MATCH (e:Event)-[:TARGETED_STORE]->(s:Store {store_id: 'store-1'}) WHERE e.action = 'auth_token_validated' AND e.status = 'fail' RETURN count(e) as atta
+      cks"
+  191     expected: ">= 5"
+  192     description: "Should show targeted attacks on specific store"
+  193
+  194 # Expected Neo4j graph structure
+  195 expected_graph:
+  196   nodes:
+  197     - type: "Event"
+  198       count: 6  # 1 e_token_created + 5 auth_token_validated
+  199       properties:
+  200         - "event_id (UUID v7)"
+  201         - "action (e_token_created, auth_token_validated)"
+  202         - "status (null, fail)"
+  203         - "timestamp"
+  204         - "client_ip (203.0.113.45)"
+  205         - "user_agent (Python-Requests/2.28.1)"
+  206         - "device_type (web)"
+  207         - "path (/api/v1/store-1/auth/login, /api/v1/auth/validate)"
+  208         - "store_id (store-1)"
+  209
+  210     - type: "IPAddress"
+  211       count: 1
+  212       properties:
+  213         - "address (203.0.113.45)"
+  214         - "first_seen"
+  215         - "last_seen"
+  216
+  217     - type: "Store"
+  218       count: 1
+  219       properties:
+  220         - "store_id (store-1)"
+  221         - "created_at"
+  222
+  223   relationships:
+  224     - type: "ORIGINATED_FROM"
+  225       count: 6  # All events from same IP
+  226       from: "Event"
+  227       to: "IPAddress"
+  228
+  229     - type: "TARGETED_STORE"
+  230       count: 6  # All events target same store
+  231       from: "Event"
+  232       to: "Store"
+  233
+  234 # Success criteria
+  235 assertions:
+  236   - "All auth attempts should fail (401)"
+  237   - "All requests from same IP address"
+  238   - "Bot user agent detected"
+  239   - "Events written to Neo4j"
+  240   - "Graph relationships created correctly"
+  241
+  242 # Expected results (for reporting)
+  243 results:
+  244   display:
+  245     - label: "Attack Type"
+  246       value: "Brute Force (Failed Authentication)"
+  247     - label: "Attacker IP"
+  248       value: "{attacker_ip}"
+  249     - label: "Failed Attempts"
+  250       value: "5+"
+  251     - label: "User Agent"
+  252       value: "{user_agent}"
+  253     - label: "Target Store"
+  254       value: "{store_id}"
+  255     - label: "Detection Status"
+  256       value: "Should trigger abuse alerts"
+  257
+  258   neo4j_queries:
+  259     - name: "Find attacking IP"
+  260       query: "MATCH (ip:IPAddress {address: '203.0.113.45'})<-[:ORIGINATED_FROM]-(e:Event) RETURN ip, count(e) as event_count"
+  261
+  262     - name: "Failed auth timeline"
+  263       query: "MATCH (e:Event {action: 'auth_token_validated', status: 'fail'})-[:ORIGINATED_FROM]->(ip:IPAddress {address: '203.0.113.45'}) RETURN e.timestamp, e.pa
+      th ORDER BY e.timestamp"
+  264
+  265     - name: "Attack pattern visualization"
+  266       query: "MATCH path = (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress {address: '203.0.113.45'}) WHERE e.action = 'auth_token_validated' AND e.status = 'fail' RETU
+      RN path LIMIT 10"
+  267
+  268 # Notes for implementation
+  269 notes:
+  270   - "This blueprint demonstrates the structure for abuse scenarios"
+  271   - "Events should be published to Redis (naglfar-events channel)"
+  272   - "naglfar-event-consumer will write events to Neo4j"
+  273   - "Graph relationships demonstrate abuse pattern clearly"
+  274   - "Actual scenario runner would loop the auth attempts based on config.attempts"
+  275   - "Real attacks would have more attempts (20-100+) but blueprint shows pattern"

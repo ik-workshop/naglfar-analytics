@@ -91,6 +91,44 @@ class ScenarioGenerator:
         result_time = base_time + offset + jitter
         return result_time.isoformat().replace('+00:00', 'Z')
 
+    def generate_query_string(self, action: str, existing_query: str = None) -> str:
+        """
+        Generate a random query string for an action
+
+        Args:
+            action: Event action type
+            existing_query: Existing query string from event config (takes precedence)
+
+        Returns:
+            Query string or None
+        """
+        # If event already has a query, use it
+        if existing_query:
+            return existing_query
+
+        # Get query generation config
+        fixture_config = self.scenario_data.get('fixture_config', {})
+        query_config = fixture_config.get('query_generation', {})
+
+        # Check if query generation is enabled
+        if not query_config.get('enabled', False):
+            return None
+
+        # Check probability (e.g., 0.2 = 20% chance)
+        probability = query_config.get('probability', 0.0)
+        if random.random() > probability:
+            return None
+
+        # Get templates for this action
+        templates = query_config.get('templates', {})
+        action_templates = templates.get(action, [])
+
+        # Return random template if available
+        if action_templates:
+            return random.choice(action_templates)
+
+        return None
+
     def generate_event(self, event_config: Dict[str, Any], scenario_config: Dict[str, Any],
                     base_time: str, jitter_seconds: int) -> Dict[str, Any]:
         """
@@ -112,17 +150,23 @@ class ScenarioGenerator:
         # Generate event_id (UUID v7)
         event_id = UUIDv7Generator.generate()
 
+        # Get action for query string generation
+        action = event_config.get('action')
+
+        # Generate or use existing query string
+        query = self.generate_query_string(action, event_config.get('query'))
+
         # Build event object based on Neo4j v2.0 model
         event = {
             "event_id": event_id,
-            "action": event_config.get('action'),
+            "action": action,
             "status": event_config.get('status'),
             "timestamp": timestamp,
             "client_ip": event_config.get('client_ip'),
             "user_agent": event_config.get('user_agent'),
             "device_type": event_config.get('device_type'),
             "path": event_config.get('path'),
-            "query": event_config.get('query'),
+            "query": query,
             "session_id": scenario_config.get('session_id'),
             "user_id": event_config.get('user_id'),
             "email": event_config.get('email'),
@@ -138,7 +182,8 @@ class ScenarioGenerator:
         if self.verbose:
             action = event.get('action', 'unknown')
             ts_offset = offset_minutes
-            print(f"  + Event: {action} @ +{ts_offset}m (id: {event_id[:8]}...)")
+            query_str = f" query={query}" if query else ""
+            print(f"  + Event: {action} @ +{ts_offset}m{query_str} (id: {event_id[:8]}...)")
 
         return event
 
@@ -223,15 +268,22 @@ class ScenarioGenerator:
             ip = random.choice(ips)
             device = random.choice(devices)
 
+            # Get action for query generation
+            action = endpoint.get('action', 'view_books')
+
+            # Generate query string for noise event
+            query = self.generate_query_string(action)
+
             # Create noise event
             event = {
                 "event_id": UUIDv7Generator.generate(),
-                "action": endpoint.get('action', 'view_books'),
+                "action": action,
                 "timestamp": timestamp,
                 "client_ip": ip.get('address'),
                 "user_agent": device.get('user_agent'),
                 "device_type": device.get('device_type'),
                 "path": endpoint.get('path', '/api/v1/{store}/books').replace('{store}', store.get('id')),
+                "query": query,
                 "session_id": UUIDv7Generator.generate(),
                 "user_id": user.get('user_id'),
                 "email": user.get('email'),
