@@ -1,0 +1,23 @@
+---
+title: Graph Diagram (Shows actual graph structure)
+---
+graph LR
+    Request[Request arrives] -->|Layer 3/4| E1[Event: auth_token_validated]
+    Request -->|Layer 4| E2[Event: e_token_created]
+    Request -->|Layer 5| E3[Event: business action]
+
+    E1 -->|ORIGINATED_FROM| IP[IPAddress]
+    E1 -->|IN_SESSION| S[Session]
+    E1 -->|PERFORMED_BY| U[User]
+    E1 -->|TARGETED_STORE| ST[Store]
+
+    E2 -->|ORIGINATED_FROM| IP
+    E2 -->|TARGETED_STORE| ST
+
+    E3 -->|ORIGINATED_FROM| IP
+    E3 -->|IN_SESSION| S
+    E3 -->|PERFORMED_BY| U
+    E3 -->|TARGETED_STORE| ST
+
+    E1 -->|NEXT_EVENT| E2
+    E2 -->|NEXT_EVENT| E3

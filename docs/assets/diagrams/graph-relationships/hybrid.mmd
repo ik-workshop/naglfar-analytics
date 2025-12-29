@@ -1,0 +1,26 @@
+---
+title: Flowchart with Graph Annotations (Hybrid)
+description:
+---
+flowchart TD
+    A[Request: client_ip, user_agent, path] --> B{Layer?}
+
+    B -->|Layer 3/4<br/>naglfar-validation| C[Create Event:<br/>auth_token_validated<br/>or e_token_created]
+    B -->|Layer 5<br/>backend service| D[Create Event:<br/>business action]
+
+    C --> E[MERGE IPAddress<br/>from client_ip]
+    C --> F[MERGE Session<br/>if session_id exists]
+    C --> G[MERGE User<br/>if user_id exists]
+    C --> H[MERGE Store<br/>if store_id exists]
+
+    D --> E
+    D --> F
+    D --> G
+    D --> H
+
+    E --> I[Create Relationships:<br/>Event→IP, Event→Session<br/>Event→User, Event→Store]
+    F --> I
+    G --> I
+    H --> I
+
+    I --> J[Link NEXT_EVENT<br/>to previous event<br/>in same session]

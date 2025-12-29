@@ -1,0 +1,41 @@
+---
+title: ER Diagram (Entity-Relationship)
+description:
+---
+erDiagram
+    Event ||--o{ IPAddress : ORIGINATED_FROM
+    Event ||--o{ Session : IN_SESSION
+    Event ||--o{ User : PERFORMED_BY
+    Event ||--o{ Store : TARGETED_STORE
+    Event ||--o{ Event : NEXT_EVENT
+
+    Event {
+        string event_id PK
+        string action
+        string status
+        datetime timestamp
+        string client_ip
+        string path
+        string query
+    }
+
+    IPAddress {
+        string address PK
+        datetime first_seen
+        datetime last_seen
+    }
+
+    Session {
+        string session_id PK
+        datetime created_at
+    }
+
+    User {
+        int user_id PK
+        datetime created_at
+    }
+
+    Store {
+        string store_id PK
+        datetime created_at
+    }
