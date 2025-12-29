@@ -1,41 +1,50 @@
 ---
-title: ER Diagram (Entity-Relationship)
-description:
+title: Naglfar Analytics - Graph Database ER Diagram
+description: Event-centric model for abuse detection. Events connect to identity entities (IP, Session, User, Store).
 ---
 erDiagram
-    Event ||--o{ IPAddress : ORIGINATED_FROM
-    Event ||--o{ Session : IN_SESSION
-    Event ||--o{ User : PERFORMED_BY
-    Event ||--o{ Store : TARGETED_STORE
-    Event ||--o{ Event : NEXT_EVENT
+    IPAddress ||--o{ Event : "ORIGINATED_FROM"
+    Session ||--o{ Event : "IN_SESSION"
+    User ||--o{ Event : "PERFORMED_BY"
+    Store ||--o{ Event : "TARGETED_STORE"
+    Event ||--o| Event : "NEXT_EVENT"
 
     Event {
-        string event_id PK
-        string action
-        string status
-        datetime timestamp
-        string client_ip
-        string path
-        string query
+        string event_id PK "Unique event UUID"
+        string action "auth_token_validated, e_token_created, view_books, etc"
+        string status "pass or fail (auth events only)"
+        datetime timestamp "Event occurrence time"
+        string client_ip "Client IP address"
+        string user_agent "User agent string"
+        string device_type "mobile or web"
+        string path "Request path"
+        string query "Query string"
+        string session_id FK "Session ID (optional)"
+        int user_id FK "User ID (optional)"
+        string store_id FK "Store ID (optional)"
+        string auth_token_id "Auth token ID (optional)"
+        json data "Event-specific data payload"
+        boolean archived "Archived flag (retention policy)"
     }
 
     IPAddress {
-        string address PK
-        datetime first_seen
-        datetime last_seen
+        string address PK "IP address (IPv4/IPv6)"
+        datetime first_seen "First time observed"
+        datetime last_seen "Most recent activity"
     }
 
     Session {
-        string session_id PK
-        datetime created_at
+        string session_id PK "UUID v7 session identifier"
+        datetime created_at "Session creation time"
+        datetime last_activity "Most recent activity"
     }
 
     User {
-        int user_id PK
-        datetime created_at
+        int user_id PK "User account ID"
+        datetime created_at "Account creation / first seen"
     }
 
     Store {
-        string store_id PK
-        datetime created_at
+        string store_id PK "Store identifier (store-1, store-2, etc)"
+        datetime created_at "First seen timestamp"
     }
