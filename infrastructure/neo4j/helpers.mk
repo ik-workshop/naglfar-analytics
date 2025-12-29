@@ -8,9 +8,9 @@ compose-neo4j-up: ## Build neo4j services
 	@echo "Readiness check: http://localhost:8080/readyz"
 	docker-compose -f $(INFRASTRUCTURE_NEO4J_DIR)/docker-compose.yml up
 
-compose-neo4j-down: ## Stop and remove neo4j containers
+compose-neo4j-down: ## Stop and remove neo4j containers (--volumes to also remove volumes)
 	@echo "Stopping docker-compose services..."
-	docker-compose -f $(INFRASTRUCTURE_NEO4J_DIR)/docker-compose.yml down --remove-orphans --volumes
+	docker-compose -f $(INFRASTRUCTURE_NEO4J_DIR)/docker-compose.yml down --remove-orphans
 
 compose-neo4j-logs: ## Show docker compose logs
 	@echo "Showing docker-compose logs..."

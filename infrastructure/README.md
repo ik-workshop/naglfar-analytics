@@ -321,6 +321,7 @@ lsof -i :80
 - [Traefik Documentation](https://doc.traefik.io/traefik/)
 - [Traefik Docker Provider](https://doc.traefik.io/traefik/providers/docker/)
 - [Docker Networking](https://docs.docker.com/network/)
+- [Docker Compose Health Check](https://last9.io/blog/docker-compose-health-checks/)
 
 ## License
 

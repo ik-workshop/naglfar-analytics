@@ -359,6 +359,7 @@ These endpoints are commonly used by:
 - [Redis mod](https://hub.docker.com/r/redislabs/redismod)
 - [Neo4J Driver](https://neo4j.com/docs/dotnet-manual/current/)
 - [Neo4j examples](https://github.com/neo4j-graph-examples)
+- [Access Neptune](https://github.com/aws-samples/aws-dbs-refarch-graph/tree/master/src/connecting-using-a-load-balancer)
 
 ## License
 

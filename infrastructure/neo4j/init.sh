@@ -4,6 +4,7 @@
 
 set -e
 
+echo "Starting Neo4j schema Initialization... date: $(date)"
 echo "Waiting for Neo4j to be ready..."
 
 # Wait for Neo4j to be available (max 60 seconds)
