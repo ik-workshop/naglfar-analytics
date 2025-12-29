@@ -20,3 +20,5 @@ compose-restart: ## Rebuild and restart multiple services
 	@docker compose -f $(INFRASTRUCTURE_DIR)/docker-compose.yml up -d --build api-gateway
 	@docker compose -f $(INFRASTRUCTURE_DIR)/docker-compose.yml up -d --build redis-insight
 	@docker compose -f $(INFRASTRUCTURE_DIR)/docker-compose.yml up -d --build neo4j
+
+-include infrastructure/neo4j/helpers.mk

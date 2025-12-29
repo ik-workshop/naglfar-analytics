@@ -8,10 +8,6 @@ CAPACITY_IMAGE := naglfar-capacity-tests
 CAPACITY_RESULTS_DIR := $(CAPACITY_DIR)/results
 TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
 
-help: ## Show this help message
-	@echo "Capacity Testing Commands:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
-
 capacity-build: ## Build Gatling capacity testing Docker image
 	@echo "Building Gatling capacity test image..."
 	docker build -t $(CAPACITY_IMAGE) $(CAPACITY_DIR)
