@@ -1,0 +1,355 @@
+name: "Session Sharing Attack"
+description: "Demonstrates abuse detection: Single session/auth_token used by multiple user accounts from different IPs"
+
+metadata:
+  attack_type: "session_sharing"
+  severity: "high"
+
+  # Attack pattern definition
+  pattern:
+    description: "Multiple users sharing same session_id and auth_token_id"
+    behavior:
+      - "User A authenticates and gets session_id + auth_token_id"
+      - "User B uses same session_id + auth_token_id from different IP"
+      - "User C uses same session_id + auth_token_id from yet another IP"
+    indicators:
+      - "Same session_id with different user_id values"
+      - "Same auth_token_id from multiple IP addresses"
+      - "Session accessed from geographically diverse IPs in short time"
+      - "Multiple device types for single session"
+
+  # Detection rules (what to look for in graph)
+  detection_rules:
+    Session:
+      - pattern: "session_id linked to multiple user_ids"
+        query_hint: "MATCH (e:Event)-[:IN_SESSION]->(s:Session) WHERE e.user_id IS NOT NULL WITH s, collect(DISTINCT e.user_id) as users WHERE size(users) > 1"
+
+    IPAddress:
+      - pattern: "auth_token_id used from multiple IPs"
+        query_hint: "MATCH (e:Event) WHERE e.auth_token_id IS NOT NULL WITH e.auth_token_id as token, collect(DISTINCT e.client_ip) as ips WHERE size(ips) > 1"
+
+    User:
+      - pattern: "rapid user switching in same session"
+        query_hint: "MATCH (e:Event)-[:IN_SESSION]->(s:Session) WITH s, e ORDER BY e.timestamp RETURN s.session_id, collect(e.user_id)"
+
+# Fixture generation configuration
+fixture_config:
+  # Time range for generated events
+  time_range:
+    start: "2025-12-29T10:00:00Z"
+    end: "2025-12-29T12:00:00Z"
+    duration_hours: 2
+
+  # How many session sharing instances to create
+  instances: 3
+
+  # Events per shared session
+  events_per_session:
+    min: 5
+    max: 15
+
+  # Stores to target
+  stores:
+    - id: "store-1"
+      weight: 0.5  # 50% of events
+    - id: "store-2"
+      weight: 0.3  # 30% of events
+    - id: "store-3"
+      weight: 0.2  # 20% of events
+
+  # Endpoints to access
+  endpoints:
+    - path: "/api/v1/{store}/books"
+      method: "GET"
+      action: "view_books"
+      weight: 0.4
+    - path: "/api/v1/{store}/books/{id}"
+      method: "GET"
+      action: "view_book_detail"
+      weight: 0.2
+    - path: "/api/v1/{store}/cart/add"
+      method: "POST"
+      action: "add_to_cart"
+      weight: 0.2
+    - path: "/api/v1/{store}/cart"
+      method: "GET"
+      action: "view_cart"
+      weight: 0.1
+    - path: "/api/v1/{store}/checkout"
+      method: "POST"
+      action: "checkout"
+      weight: 0.1
+
+  # User accounts involved in sharing
+  users:
+    - user_id: 1001
+      email: "alice.anderson@example.com"
+      legitimate: true  # Original session owner
+    - user_id: 1002
+      email: "bob.brown@example.com"
+      legitimate: false  # Sharing victim's session
+    - user_id: 1003
+      email: "carol.clark@example.com"
+      legitimate: false  # Also sharing
+    - user_id: 1004
+      email: "david.davis@example.com"
+      legitimate: false
+    - user_id: 1005
+      email: "emily.evans@example.com"
+      legitimate: false
+
+  # IP addresses to use
+  ip_addresses:
+    - address: "192.168.1.100"
+      location: "New York, US"
+      legitimate: true  # Original user's IP
+    - address: "203.0.113.45"
+      location: "Moscow, RU"
+      legitimate: false  # Attacker IP
+    - address: "198.51.100.23"
+      location: "Shanghai, CN"
+      legitimate: false  # Another attacker
+    - address: "10.0.0.50"
+      location: "London, UK"
+      legitimate: false
+
+  # Device types and user agents
+  devices:
+    - device_type: "web"
+      user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      weight: 0.4
+    - device_type: "mobile"
+      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X)"
+      weight: 0.3
+    - device_type: "web"
+      user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+      weight: 0.2
+    - device_type: "mobile"
+      user_agent: "Mozilla/5.0 (Linux; Android 10; SM-G973F)"
+      weight: 0.1
+
+# Session sharing scenarios (specific instances)
+scenarios:
+  # Scenario 1: Compromised session shared among 3 users
+  - name: "Compromised Session #1"
+    session_id: "01963852-c3c4-7b4a-a9e3-7f8c5d6e4f3a"  # UUID v7
+    auth_token_id: "token_abc123def456"
+
+    # Timeline of events
+    events:
+      - timestamp_offset_minutes: 0
+        user_id: 1001
+        client_ip: "192.168.1.100"
+        device_type: "web"
+        action: "auth_token_validated"
+        status: "pass"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books"
+        description: "Legitimate user authenticates"
+
+      - timestamp_offset_minutes: 2
+        user_id: 1001
+        client_ip: "192.168.1.100"
+        device_type: "web"
+        action: "view_books"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books"
+        description: "Legitimate browsing"
+
+      - timestamp_offset_minutes: 5
+        user_id: 1002  # DIFFERENT USER
+        client_ip: "203.0.113.45"  # DIFFERENT IP
+        device_type: "mobile"  # DIFFERENT DEVICE
+        action: "view_books"
+        store_id: "store-2"
+        path: "/api/v1/store-2/books"
+        description: "SUSPICIOUS: Different user using same session"
+
+      - timestamp_offset_minutes: 7
+        user_id: 1002
+        client_ip: "203.0.113.45"
+        device_type: "mobile"
+        action: "add_to_cart"
+        store_id: "store-2"
+        path: "/api/v1/store-2/cart/add"
+        description: "Attacker adding items"
+
+      - timestamp_offset_minutes: 10
+        user_id: 1003  # THIRD USER
+        client_ip: "198.51.100.23"  # THIRD IP
+        device_type: "web"
+        action: "view_cart"
+        store_id: "store-2"
+        path: "/api/v1/store-2/cart"
+        description: "SUSPICIOUS: Third user in same session"
+
+      - timestamp_offset_minutes: 12
+        user_id: 1001  # Original user back
+        client_ip: "192.168.1.100"
+        device_type: "web"
+        action: "checkout"
+        store_id: "store-2"
+        path: "/api/v1/store-2/checkout"
+        description: "Victim completes fraudulent checkout"
+
+  # Scenario 2: Another compromised session
+  - name: "Compromised Session #2"
+    session_id: "01963852-d4e5-7c5b-b0f4-8f9d6e5f4e4b"
+    auth_token_id: "token_xyz789ghi012"
+
+    events:
+      - timestamp_offset_minutes: 15
+        user_id: 1004
+        client_ip: "10.0.0.50"
+        device_type: "web"
+        action: "auth_token_validated"
+        status: "pass"
+        store_id: "store-3"
+        path: "/api/v1/store-3/books"
+
+      - timestamp_offset_minutes: 20
+        user_id: 1005  # DIFFERENT USER
+        client_ip: "203.0.113.45"  # Same attacker IP as before
+        device_type: "mobile"
+        action: "view_books"
+        store_id: "store-3"
+        path: "/api/v1/store-3/books"
+        description: "Same attacker IP targeting different session"
+
+# Expected Neo4j graph structure
+expected_graph:
+  nodes:
+    Event:
+      count: "~40-60"
+      key_properties:
+        - event_id
+        - action
+        - timestamp
+        - session_id
+        - user_id
+        - client_ip
+        - auth_token_id
+        - device_type
+        - store_id
+
+    Session:
+      count: 2  # Two compromised sessions
+      suspicious_pattern: "Multiple distinct user_ids per session"
+
+    User:
+      count: 5  # Five users involved
+      suspicious_pattern: "Users sharing session_ids"
+
+    IPAddress:
+      count: 4  # Four different IPs
+      suspicious_pattern: "Same auth_token from multiple IPs"
+
+    Store:
+      count: 3
+
+  relationships:
+    IN_SESSION:
+      pattern: "Events → Session (same session, different users)"
+      count: "~40-60"
+
+    PERFORMED_BY:
+      pattern: "Events → User (multiple users per session)"
+      count: "~40-60"
+
+    ORIGINATED_FROM:
+      pattern: "Events → IPAddress (same session from multiple IPs)"
+      count: "~40-60"
+
+    TARGETED_STORE:
+      pattern: "Events → Store"
+      count: "~40-60"
+
+# Abuse detection queries
+abuse_assertions:
+  - name: "Detect sessions with multiple users"
+    query: |
+      MATCH (e:Event)-[:IN_SESSION]->(s:Session)
+      WHERE e.user_id IS NOT NULL
+      WITH s.session_id as session_id, collect(DISTINCT e.user_id) as user_ids
+      WHERE size(user_ids) > 1
+      RETURN session_id, user_ids, size(user_ids) as user_count
+      ORDER BY user_count DESC
+    expected_result_count: 2
+    description: "Should find 2 sessions with multiple users"
+
+  - name: "Detect auth tokens used from multiple IPs"
+    query: |
+      MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress)
+      WHERE e.auth_token_id IS NOT NULL
+      WITH e.auth_token_id as token, collect(DISTINCT ip.address) as ips
+      WHERE size(ips) > 1
+      RETURN token, ips, size(ips) as ip_count
+      ORDER BY ip_count DESC
+    expected_result_count: 2
+    description: "Should find 2 auth tokens used from multiple IPs"
+
+  - name: "Detect suspicious IP behavior"
+    query: |
+      MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress {address: '203.0.113.45'})
+      WHERE e.user_id IS NOT NULL
+      RETURN ip.address, collect(DISTINCT e.user_id) as user_ids, count(e) as event_count
+    expected_result_count: 1
+    description: "Attacker IP should show multiple user accounts"
+
+  - name: "Detect rapid user switching in session"
+    query: |
+      MATCH (e:Event)-[:IN_SESSION]->(s:Session {session_id: '01963852-c3c4-7b4a-a9e3-7f8c5d6e4f3a'})
+      WHERE e.user_id IS NOT NULL
+      RETURN e.timestamp, e.user_id, e.client_ip, e.device_type, e.action
+      ORDER BY e.timestamp
+    expected_result_count: ">= 5"
+    description: "Should show timeline of user switching"
+
+# Python fixture generator hints
+generator_config:
+  strategy: "scenario_based"  # Generate events based on scenarios list
+
+  # How to generate timestamps
+  timestamp_generation:
+    method: "offset_based"  # Use timestamp_offset_minutes from each event
+    base_time: "${fixture_config.time_range.start}"
+    jitter_seconds: 5  # Add random jitter ±5 seconds
+
+  # How to generate event_ids
+  event_id_generation:
+    method: "uuid_v7"  # Time-ordered UUIDs
+
+  # Additional events to add (noise)
+  noise_events:
+    enabled: true
+    count: 20
+    description: "Add legitimate events from other users to make pattern realistic"
+
+  # Validation
+  validation:
+    - check: "Each scenario creates events for all users in timeline"
+    - check: "Same session_id used across all events in scenario"
+    - check: "Same auth_token_id used across all events in scenario"
+    - check: "Timestamps are monotonically increasing within scenario"
+
+# Output format
+output:
+  format: "json"  # Array of event objects
+  file: "session-sharing-events.json"
+
+  # Event structure (maps to Neo4j v2.0 model)
+  event_schema:
+    event_id: "string (UUID v7)"
+    action: "string"
+    status: "string | null"
+    timestamp: "string (ISO 8601)"
+    client_ip: "string"
+    user_agent: "string"
+    device_type: "string"
+    path: "string"
+    query: "string | null"
+    session_id: "string (UUID v7)"
+    user_id: "integer"
+    store_id: "string"
+    auth_token_id: "string"
+    data: "json | null"

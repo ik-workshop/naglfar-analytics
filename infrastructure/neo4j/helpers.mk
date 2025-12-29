@@ -19,3 +19,6 @@ compose-neo4j-logs: ## Show docker compose logs
 compose-neo4j-restart: ## Rebuild and restart multiple services
 # 	@docker compose -f $(INFRASTRUCTURE_NEO4J_DIR)/docker-compose.yml restart neo4j
 	@docker compose -f $(INFRASTRUCTURE_NEO4J_DIR)/docker-compose.yml up -d  neo4j-init
+
+pip-neo4j-install: ## Install python dependencies for neo4j helper scripts
+    pip install -r $(INFRASTRUCTURE_NEO4J_DIR)/requirements.txt
