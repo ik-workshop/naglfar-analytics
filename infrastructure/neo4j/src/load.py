@@ -10,6 +10,8 @@ Usage:
     python src/load.py --input scenarios/fixtures/credential-stuffing-events.json --batch-size 500
     python src/load.py --input scenarios/fixtures/device-switching-events.json
     python src/load.py --input scenarios/fixtures/session-sharing-events.json
+    python src/load.py --input scenarios/fixtures/token-abuse-events.json
+    python src/load.py --input scenarios/fixtures/flow-anomaly-events.json
     python src/load.py --uri bolt://localhost:7687 --user neo4j --password naglfar123
 """
 

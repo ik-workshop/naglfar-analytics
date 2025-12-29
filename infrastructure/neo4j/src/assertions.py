@@ -8,6 +8,8 @@ Usage:
     python src/assertions.py --name session-sharing
     python src/assertions.py --name credential-stuffing --verbose
     python src/assertions.py --name device-switching --uri bolt://localhost:7687
+    python src/assertions.py --name token-abuse
+    python src/assertions.py --name flow-anomaly
 """
 
 import argparse

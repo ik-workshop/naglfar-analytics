@@ -65,6 +65,51 @@ Session #1 (01963852-a1b2-9e8f-d3c4-5e6f7a8b9c0d):
 00:12 - mobile (45.142.212.99, NL)         ⚠️ 4th device in 12 mins
 ```
 
+### 4. Flow Anomaly (`flow-anomaly.yaml`)
+**Pattern**: Users accessing resources in abnormal sequence or skipping required steps
+
+- **Attack Type**: flow_anomaly
+- **Severity**: medium
+- **Focus**: Bypassing normal application flow or suspicious action sequences
+- **Key Indicators**:
+  - Protected actions without prior authentication
+  - Checkout events without adding items to cart
+  - Backwards flow (checkout → browse → cart)
+  - Nonsensical event sequences
+  - Missing required intermediate steps
+
+**Example Anomalies**:
+```
+Normal:   auth → browse → cart → checkout
+Anomaly:  browse → checkout (skipped cart)
+Anomaly:  checkout → browse → cart (backwards)
+Anomaly:  checkout (no auth, no cart)
+```
+
+### 5. Token Abuse (`token-abuse.yaml`)
+**Pattern**: Authentication tokens being shared, sold, or abused
+
+- **Attack Type**: token_abuse
+- **Severity**: critical
+- **Focus**: Single auth token used abnormally across users, IPs, or in excessive volume
+- **Key Indicators**:
+  - Same auth_token_id from 7+ different IP addresses
+  - Same token used by multiple user_id values
+  - Geographic impossibility (same token in multiple countries simultaneously)
+  - Excessive request rate (100+ events in short time)
+  - Token used from bot/scraper user agents
+
+**Example Abuse**:
+```
+Token "token_shared_premium_6001" used from:
+00:00 - Boston, US      (192.168.1.50)       User 6001 [Original]
+00:05 - Moscow, Russia   (203.0.113.10)       User 6002 ⚠️ Token buyer
+00:06 - Beijing, China   (198.51.100.20)      User 6003 ⚠️ Simultaneous
+00:08 - Berlin, Germany  (185.220.101.30)     User 6004 ⚠️ Shared token
+00:10 - Singapore        (103.89.234.50)      User 6002 ⚠️ 5th location
+→ Same token across 7 countries, 5 users in 20 minutes
+```
+
 ## Generating Fixtures
 
 ### Basic Usage
@@ -257,6 +302,8 @@ ORDER BY device_count DESC
 | Session Sharing     | Multiple user_ids      | Same session, different users           | High      |
 | Credential Stuffing | Multiple IPs × users   | Distributed auth attempts               | Critical  |
 | Device Switching    | Changing device_type   | Same session, impossible device changes | High      |
+| Flow Anomaly        | Action sequences       | Skipped steps, backwards flow           | Medium    |
+| Token Abuse         | auth_token_id sharing  | Token from many IPs/users               | Critical  |
 
 ## Noise Events
 
@@ -281,13 +328,18 @@ Noise events:
 ```
 scenarios/
 ├── readme.md                          # This file
+├── blueprint.yaml                     # Template for creating new scenarios
 ├── session-sharing.yaml               # Session sharing scenario
 ├── credential-stuffing.yaml           # Credential stuffing scenario
 ├── device-switching.yaml              # Device switching scenario
+├── flow-anomaly.yaml                  # Flow anomaly detection scenario
+├── token-abuse.yaml                   # Token abuse detection scenario
 └── fixtures/                          # Generated JSON fixtures
     ├── session-sharing-events.json
     ├── credential-stuffing-events.json
-    └── device-switching-events.json
+    ├── device-switching-events.json
+    ├── flow-anomaly-events.json
+    └── token-abuse-events.json
 ```
 
 ## Testing Workflow
@@ -350,7 +402,7 @@ python src/assertions.py \
 
 ```bash
 # Test all scenarios in sequence
-for scenario in session-sharing credential-stuffing device-switching; do
+for scenario in session-sharing credential-stuffing device-switching flow-anomaly token-abuse; do
   echo "Testing $scenario..."
   python src/scenario.py --name $scenario
   python src/load.py --input scenarios/fixtures/${scenario}-events.json
@@ -358,10 +410,91 @@ for scenario in session-sharing credential-stuffing device-switching; do
 done
 ```
 
+## Neo4j Browser Configuration
+
+### Increase Node Display Limit
+
+By default, Neo4j Browser only displays the first 300 nodes. To see more nodes:
+
+**Method 1: Browser Settings (Recommended)**
+1. Open Neo4j Browser (http://localhost:7474)
+2. Click the **gear icon** (⚙️) in the bottom left corner
+3. Find **"Initial Node Display"** setting
+4. Change from `300` to `1000` (or higher)
+5. Click **"Apply"** or close settings
+
+**Method 2: Query with LIMIT**
+```cypher
+// Instead of returning all nodes, use LIMIT
+MATCH (e:Event)
+RETURN e
+ORDER BY e.timestamp DESC
+LIMIT 500
+```
+
+**Method 3: Use Specific Queries**
+```cypher
+// Query for specific patterns instead of all nodes
+MATCH (s:Session)<-[:IN_SESSION]-(e:Event)
+WHERE s.session_id = '01963852-c3c4-7b4a-a9e3-7f8c5d6e4f3a'
+RETURN s, e
+ORDER BY e.timestamp
+```
+
+### Recommended Browser Settings
+
+```
+Initial Node Display: 1000
+Max Neighbours: 100
+Max Rows: 1000
+Connect result nodes: ON (for relationship visualization)
+```
+
+### Efficient Queries for Large Datasets
+
+```cypher
+// ✅ Good: Count without displaying all nodes
+MATCH (e:Event)
+RETURN count(e) as total_events
+
+// ✅ Good: Sample data with LIMIT
+MATCH (e:Event)
+RETURN e
+ORDER BY e.timestamp DESC
+LIMIT 100
+
+// ✅ Good: Specific pattern with filters
+MATCH (e:Event {action: 'checkout'})
+WHERE e.timestamp > datetime() - duration('PT1H')
+RETURN e
+LIMIT 50
+
+// ❌ Bad: Returns everything (can be thousands of nodes)
+MATCH (e:Event)
+RETURN e
+```
+
+### Viewing Results in Table Format
+
+For queries returning many results, use **table view** instead of graph view:
+
+1. Run your query in Neo4j Browser
+2. Click **"Table"** tab (instead of "Graph")
+3. See all results in tabular format without node display limit
+
+**Example:**
+```cypher
+// This might return 1000+ rows - use table view
+MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress)
+RETURN e.action, e.timestamp, ip.address, e.user_id
+ORDER BY e.timestamp DESC
+```
+
 ## Next Steps
 
 1. **Generate fixtures**: Run `python src/scenario.py --name <scenario>`
 2. **Load into Neo4j**: Run `python src/load.py --input scenarios/fixtures/<scenario>-events.json`
 3. **Run assertions**: Run `python src/assertions.py --name <scenario>`
-4. **Analyze patterns**: Visualize graph relationships in Neo4j Browser
-5. **Tune detection**: Adjust thresholds based on false positive rates
+4. **Configure Neo4j Browser**: Increase Initial Node Display to 1000+
+5. **Analyze patterns**: Visualize graph relationships in Neo4j Browser
+6. **Tune detection**: Adjust thresholds based on false positive rates

@@ -2,6 +2,10 @@
 
 This directory contains scripts to automatically initialize the Neo4j database schema on startup.
 
+## Helper Commands
+
+- Show all nodes -> `MATCH (n) RETURN n`
+
 ## Resources
 
 - [Neo4j admin](https://neo4j.com/docs/operations-manual/current/neo4j-admin-neo4j-cli/#_environment_variables)

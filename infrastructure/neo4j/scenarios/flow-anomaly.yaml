@@ -1,0 +1,479 @@
+name: "Flow Anomaly Detection"
+description: "Demonstrates abuse detection: Users accessing resources in abnormal sequence or skipping required steps"
+
+metadata:
+  attack_type: "flow_anomaly"
+  severity: "medium"
+
+  # Attack pattern definition
+  pattern:
+    description: "Users bypassing normal application flow or accessing resources in suspicious order"
+    behavior:
+      - "Attacker skips authentication but accesses protected resources"
+      - "User goes directly to checkout without adding items to cart"
+      - "Suspicious action sequences (checkout → browse → checkout)"
+      - "Accessing admin/protected endpoints without proper authorization flow"
+    indicators:
+      - "Protected actions without prior auth_token_validated event"
+      - "Checkout events without prior add_to_cart events"
+      - "Backwards or nonsensical event sequences"
+      - "Missing required intermediate steps"
+      - "Accessing resources before session creation"
+
+  # Detection rules (what to look for in graph)
+  detection_rules:
+    Session:
+      - pattern: "Sessions with checkout but no cart events"
+        query_hint: "MATCH (s:Session)<-[:IN_SESSION]-(e:Event) WITH s, collect(e.action) as actions WHERE 'checkout' IN actions AND NOT 'add_to_cart' IN actions"
+
+    Event:
+      - pattern: "Protected actions without auth event"
+        query_hint: "MATCH (e:Event) WHERE e.action IN ['checkout', 'view_orders'] AND NOT exists((e)-[:IN_SESSION]->(:Session)<-[:IN_SESSION]-(:Event {action: 'auth_token_validated'}))"
+
+    User:
+      - pattern: "Users with abnormal flow patterns"
+        query_hint: "MATCH (u:User)<-[:PERFORMED_BY]-(e:Event) WITH u, collect(e.action) as actions WHERE size(actions) > 3"
+
+# Fixture generation configuration
+fixture_config:
+  # Time range for generated events
+  time_range:
+    start: "2025-12-29T16:00:00Z"
+    end: "2025-12-29T18:00:00Z"
+    duration_hours: 2
+
+  # Stores to target
+  stores:
+    - id: "store-1"
+      weight: 0.6
+    - id: "store-2"
+      weight: 0.4
+
+  # Endpoints/actions
+  endpoints:
+    - path: "/api/v1/{store}/auth/validate"
+      action: "auth_token_validated"
+      weight: 0.1
+    - path: "/api/v1/{store}/books"
+      action: "view_books"
+      weight: 0.3
+    - path: "/api/v1/{store}/books/{id}"
+      action: "view_book_detail"
+      weight: 0.2
+    - path: "/api/v1/{store}/cart/add"
+      action: "add_to_cart"
+      weight: 0.15
+    - path: "/api/v1/{store}/cart"
+      action: "view_cart"
+      weight: 0.1
+    - path: "/api/v1/{store}/checkout"
+      action: "checkout"
+      weight: 0.1
+    - path: "/api/v1/{store}/orders"
+      action: "view_orders"
+      weight: 0.05
+
+  # User accounts
+  users:
+    - user_id: 4001
+      email: "legitimate.user@example.com"
+      legitimate: true
+    - user_id: 4002
+      email: "flow.bypasser@example.com"
+      legitimate: false
+    - user_id: 4003
+      email: "direct.checkout@example.com"
+      legitimate: false
+    - user_id: 4004
+      email: "bot.scraper@example.com"
+      legitimate: false
+
+  # IP addresses
+  ip_addresses:
+    - address: "192.168.1.200"
+      location: "Chicago, US"
+      type: "home_broadband"
+      legitimate: true
+    - address: "45.142.212.200"
+      location: "Netherlands (VPN)"
+      type: "vpn"
+      legitimate: false
+    - address: "203.0.113.100"
+      location: "Unknown (Proxy)"
+      type: "proxy"
+      legitimate: false
+
+  # Devices
+  devices:
+    - device_type: "web"
+      user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      weight: 0.5
+    - device_type: "mobile"
+      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
+      weight: 0.3
+    - device_type: "api"
+      user_agent: "Python-Requests/2.31.0"
+      weight: 0.2
+
+  # Query string generation
+  query_generation:
+    enabled: true
+    probability: 0.2
+    templates:
+      view_books:
+        - "?page=1"
+        - "?sort=price"
+      checkout:
+        - "?payment=card"
+        - "?fast_checkout=true"
+
+# Flow anomaly scenarios
+scenarios:
+  # Scenario 1: Normal flow (baseline for comparison)
+  - name: "Normal Flow - Baseline"
+    session_id: "01963852-f1a2-b3c4-d5e6-7f8a9b0c1d2e"
+    auth_token_id: "token_normal_4001"
+    description: "Legitimate user following proper flow"
+
+    events:
+      - timestamp_offset_minutes: 0
+        user_id: 4001
+        email: "legitimate.user@example.com"
+        client_ip: "192.168.1.200"
+        device_type: "web"
+        action: "auth_token_validated"
+        status: "pass"
+        store_id: "store-1"
+        path: "/api/v1/store-1/auth/validate"
+        description: "Normal: User authenticates"
+
+      - timestamp_offset_minutes: 1
+        user_id: 4001
+        client_ip: "192.168.1.200"
+        device_type: "web"
+        action: "view_books"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books"
+        description: "Normal: Browse books"
+
+      - timestamp_offset_minutes: 3
+        user_id: 4001
+        client_ip: "192.168.1.200"
+        device_type: "web"
+        action: "view_book_detail"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books/123"
+        description: "Normal: View book details"
+
+      - timestamp_offset_minutes: 5
+        user_id: 4001
+        client_ip: "192.168.1.200"
+        device_type: "web"
+        action: "add_to_cart"
+        store_id: "store-1"
+        path: "/api/v1/store-1/cart/add"
+        description: "Normal: Add to cart"
+
+      - timestamp_offset_minutes: 6
+        user_id: 4001
+        client_ip: "192.168.1.200"
+        device_type: "web"
+        action: "view_cart"
+        store_id: "store-1"
+        path: "/api/v1/store-1/cart"
+        description: "Normal: View cart"
+
+      - timestamp_offset_minutes: 8
+        user_id: 4001
+        client_ip: "192.168.1.200"
+        device_type: "web"
+        action: "checkout"
+        store_id: "store-1"
+        path: "/api/v1/store-1/checkout"
+        query: "?payment=card"
+        description: "Normal: Checkout"
+
+  # Scenario 2: Direct checkout without adding to cart
+  - name: "Anomaly #1 - Direct Checkout"
+    session_id: "01963852-f2b3-c4d5-e6f7-8a9b0c1d2e3f"
+    auth_token_id: "token_anomaly_4002"
+    description: "User skips cart and goes directly to checkout"
+
+    events:
+      - timestamp_offset_minutes: 10
+        user_id: 4002
+        email: "direct.checkout@example.com"
+        client_ip: "45.142.212.200"
+        device_type: "web"
+        action: "auth_token_validated"
+        status: "pass"
+        store_id: "store-1"
+        path: "/api/v1/store-1/auth/validate"
+        description: "Anomaly: User authenticates"
+
+      - timestamp_offset_minutes: 11
+        user_id: 4002
+        client_ip: "45.142.212.200"
+        device_type: "web"
+        action: "view_books"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books"
+        description: "Anomaly: Quick browse"
+
+      - timestamp_offset_minutes: 12
+        user_id: 4002
+        client_ip: "45.142.212.200"
+        device_type: "web"
+        action: "checkout"
+        store_id: "store-1"
+        path: "/api/v1/store-1/checkout"
+        query: "?fast_checkout=true"
+        description: "⚠️ ANOMALY: Direct checkout without cart"
+
+  # Scenario 3: Accessing protected resources without auth
+  - name: "Anomaly #2 - No Auth Flow"
+    session_id: "01963852-f3c4-d5e6-f7a8-9b0c1d2e3f4a"
+    description: "User accesses protected resources without authentication"
+
+    events:
+      - timestamp_offset_minutes: 20
+        user_id: 4003
+        email: "flow.bypasser@example.com"
+        client_ip: "203.0.113.100"
+        device_type: "web"
+        action: "view_books"
+        store_id: "store-2"
+        path: "/api/v1/store-2/books"
+        description: "Anomaly: Browse without auth"
+
+      - timestamp_offset_minutes: 21
+        user_id: 4003
+        client_ip: "203.0.113.100"
+        device_type: "web"
+        action: "view_orders"
+        store_id: "store-2"
+        path: "/api/v1/store-2/orders"
+        description: "⚠️ ANOMALY: View orders without auth"
+
+      - timestamp_offset_minutes: 22
+        user_id: 4003
+        client_ip: "203.0.113.100"
+        device_type: "web"
+        action: "checkout"
+        store_id: "store-2"
+        path: "/api/v1/store-2/checkout"
+        description: "⚠️ ANOMALY: Checkout without auth or cart"
+
+  # Scenario 4: Backwards flow (checkout then browse)
+  - name: "Anomaly #3 - Backwards Flow"
+    session_id: "01963852-f4d5-e6f7-a8b9-0c1d2e3f4a5b"
+    auth_token_id: "token_backwards_4004"
+    description: "Nonsensical event sequence"
+
+    events:
+      - timestamp_offset_minutes: 30
+        user_id: 4004
+        email: "bot.scraper@example.com"
+        client_ip: "45.142.212.200"
+        device_type: "api"
+        user_agent: "Python-Requests/2.31.0"
+        action: "auth_token_validated"
+        status: "pass"
+        store_id: "store-1"
+        path: "/api/v1/store-1/auth/validate"
+        description: "Bot authenticates"
+
+      - timestamp_offset_minutes: 31
+        user_id: 4004
+        client_ip: "45.142.212.200"
+        device_type: "api"
+        action: "checkout"
+        store_id: "store-1"
+        path: "/api/v1/store-1/checkout"
+        description: "⚠️ ANOMALY: Checkout first"
+
+      - timestamp_offset_minutes: 32
+        user_id: 4004
+        client_ip: "45.142.212.200"
+        device_type: "api"
+        action: "view_books"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books"
+        description: "⚠️ ANOMALY: Browse after checkout"
+
+      - timestamp_offset_minutes: 33
+        user_id: 4004
+        client_ip: "45.142.212.200"
+        device_type: "api"
+        action: "add_to_cart"
+        store_id: "store-1"
+        path: "/api/v1/store-1/cart/add"
+        description: "⚠️ ANOMALY: Add to cart after checkout"
+
+      - timestamp_offset_minutes: 34
+        user_id: 4004
+        client_ip: "45.142.212.200"
+        device_type: "api"
+        action: "checkout"
+        store_id: "store-1"
+        path: "/api/v1/store-1/checkout"
+        description: "⚠️ ANOMALY: Second checkout"
+
+# Expected Neo4j graph structure
+expected_graph:
+  nodes:
+    Event:
+      count: "~40-60"
+      key_properties:
+        - event_id
+        - action
+        - timestamp
+        - session_id
+        - user_id
+
+    Session:
+      count: 4
+      suspicious_pattern: "Sessions with checkout but no add_to_cart"
+
+    User:
+      count: 4
+      suspicious_pattern: "Users with abnormal action sequences"
+
+    IPAddress:
+      count: 3
+
+    Store:
+      count: 2
+
+  relationships:
+    IN_SESSION:
+      pattern: "Events → Session (analyze action sequences)"
+      count: "~40-60"
+
+    PERFORMED_BY:
+      pattern: "Events → User (identify flow violators)"
+      count: "~40-60"
+
+    NEXT_EVENT:
+      pattern: "Event → Event (temporal sequence for flow analysis)"
+      count: "~35-55"
+
+# Abuse detection queries
+abuse_assertions:
+  - name: "Detect checkout without cart"
+    query: |
+      MATCH (s:Session)<-[:IN_SESSION]-(e:Event)
+      WITH s.session_id as session_id,
+           collect(e.action) as actions
+      WHERE 'checkout' IN actions
+        AND NOT 'add_to_cart' IN actions
+      RETURN session_id, actions
+      ORDER BY session_id
+    expected_result_count: ">= 2"
+    description: "Should find sessions with checkout but no add_to_cart"
+
+  - name: "Detect protected actions without auth"
+    query: |
+      MATCH (s:Session)<-[:IN_SESSION]-(e:Event)
+      WHERE e.action IN ['checkout', 'view_orders']
+      WITH s, e
+      OPTIONAL MATCH (s)<-[:IN_SESSION]-(auth:Event {action: 'auth_token_validated'})
+      WHERE auth.timestamp < e.timestamp
+      WITH e, count(auth) as auth_count
+      WHERE auth_count = 0
+      RETURN e.session_id, e.action, e.user_id, e.timestamp
+      ORDER BY e.timestamp
+    expected_result_count: ">= 2"
+    description: "Should find protected actions without prior auth"
+
+  - name: "Detect backwards flow (checkout before cart)"
+    query: |
+      MATCH (s:Session)<-[:IN_SESSION]-(checkout:Event {action: 'checkout'})
+      OPTIONAL MATCH (s)<-[:IN_SESSION]-(cart:Event {action: 'add_to_cart'})
+      WHERE cart.timestamp > checkout.timestamp
+      WITH s.session_id as session_id,
+           checkout.timestamp as checkout_time,
+           cart.timestamp as cart_time
+      WHERE cart_time IS NOT NULL
+      RETURN session_id, checkout_time, cart_time
+    expected_result_count: ">= 1"
+    description: "Should find checkout events that occurred before add_to_cart"
+
+  - name: "Detect sessions with multiple checkouts"
+    query: |
+      MATCH (s:Session)<-[:IN_SESSION]-(e:Event {action: 'checkout'})
+      WITH s.session_id as session_id,
+           count(e) as checkout_count
+      WHERE checkout_count > 1
+      RETURN session_id, checkout_count
+      ORDER BY checkout_count DESC
+    expected_result_count: ">= 1"
+    description: "Should find sessions with multiple checkout attempts"
+
+  - name: "Calculate flow violation rate by user"
+    query: |
+      MATCH (u:User)<-[:PERFORMED_BY]-(e:Event)
+      WITH u.user_id as user_id,
+           u.email as email,
+           collect(e.action) as actions,
+           count(e) as total_events
+      WITH user_id, email, actions, total_events,
+           CASE
+             WHEN 'checkout' IN actions AND NOT 'add_to_cart' IN actions THEN 1
+             ELSE 0
+           END as has_violation
+      WHERE has_violation = 1
+      RETURN user_id, email, total_events, actions
+      ORDER BY total_events DESC
+    expected_result_count: ">= 2"
+    description: "Should identify users with flow violations"
+
+# Python fixture generator hints
+generator_config:
+  strategy: "scenario_based"
+
+  # How to generate timestamps
+  timestamp_generation:
+    method: "offset_based"
+    base_time: "${fixture_config.time_range.start}"
+    jitter_seconds: 3
+
+  # How to generate event_ids
+  event_id_generation:
+    method: "uuid_v7"
+
+  # Additional events to add (noise)
+  noise_events:
+    enabled: true
+    count: 60
+    description: "Add legitimate events following normal flow"
+
+  # Validation
+  validation:
+    - check: "Some sessions have checkout without add_to_cart"
+    - check: "Some sessions have protected actions without auth"
+    - check: "Event sequences follow timeline order"
+
+# Output format
+output:
+  format: "json"
+  file: "flow-anomaly-events.json"
+
+  # Event structure (maps to Neo4j v2.0 model)
+  event_schema:
+    event_id: "string (UUID v7)"
+    action: "string"
+    status: "string | null"
+    timestamp: "string (ISO 8601)"
+    client_ip: "string"
+    user_agent: "string"
+    device_type: "string"
+    path: "string"
+    query: "string | null"
+    session_id: "string (UUID v7)"
+    user_id: "integer"
+    email: "string | null"
+    store_id: "string"
+    auth_token_id: "string | null"
+    data: "json | null"
+    archived: "boolean"

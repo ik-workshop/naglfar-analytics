@@ -8,6 +8,9 @@ Usage:
     python src/scenario.py --name session-sharing
     python src/scenario.py --name credential-stuffing --output custom-output.json
     python src/scenario.py --name device-switching --verbose
+    python src/scenario.py --name device-switching --verbose
+    python src/scenario.py --name token-abuse
+    python src/scenario.py --name flow-anomaly
 """
 
 import argparse
