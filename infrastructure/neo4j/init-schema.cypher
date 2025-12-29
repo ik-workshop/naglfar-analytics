@@ -56,6 +56,10 @@ FOR (e:Event) ON (e.path);
 CREATE INDEX event_client_ip IF NOT EXISTS
 FOR (e:Event) ON (e.client_ip);
 
+// Event device_type - filter by mobile/web
+CREATE INDEX event_device_type IF NOT EXISTS
+FOR (e:Event) ON (e.device_type);
+
 // Event session_id - quick session lookup
 CREATE INDEX event_session_id IF NOT EXISTS
 FOR (e:Event) ON (e.session_id);

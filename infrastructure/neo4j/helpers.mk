@@ -10,7 +10,7 @@ compose-neo4j-up: ## Build neo4j services
 
 compose-neo4j-down: ## Stop and remove neo4j containers (--volumes to also remove volumes)
 	@echo "Stopping docker-compose services..."
-	docker-compose -f $(INFRASTRUCTURE_NEO4J_DIR)/docker-compose.yml down --remove-orphans
+	docker-compose -f $(INFRASTRUCTURE_NEO4J_DIR)/docker-compose.yml down --remove-orphans --volumes
 
 compose-neo4j-logs: ## Show docker compose logs
 	@echo "Showing docker-compose logs..."
