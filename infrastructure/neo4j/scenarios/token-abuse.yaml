@@ -425,7 +425,7 @@ abuse_assertions:
       MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress)
       WHERE e.auth_token_id IS NOT NULL
       WITH e.auth_token_id as token,
-           collect(DISTINCT ip.address) as ips
+          collect(DISTINCT ip.address) as ips
       WHERE size(ips) >= 5
       RETURN token, ips, size(ips) as ip_count
       ORDER BY ip_count DESC
@@ -437,8 +437,8 @@ abuse_assertions:
       MATCH (e:Event)-[:PERFORMED_BY]->(u:User)
       WHERE e.auth_token_id IS NOT NULL
       WITH e.auth_token_id as token,
-           collect(DISTINCT u.user_id) as user_ids,
-           collect(DISTINCT u.email) as emails
+          collect(DISTINCT u.user_id) as user_ids,
+          collect(DISTINCT u.email) as emails
       WHERE size(user_ids) > 1
       RETURN token, user_ids, emails, size(user_ids) as user_count
       ORDER BY user_count DESC
@@ -451,7 +451,7 @@ abuse_assertions:
       WHERE e.auth_token_id IS NOT NULL
         AND e.timestamp > datetime() - duration('PT1H')
       WITH e.auth_token_id as token,
-           count(e) as event_count
+          count(e) as event_count
       WHERE event_count >= 8
       RETURN token, event_count
       ORDER BY event_count DESC
