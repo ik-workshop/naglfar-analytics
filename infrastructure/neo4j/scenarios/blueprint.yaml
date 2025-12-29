@@ -1,0 +1,462 @@
+# =============================================================================
+# Neo4j Abuse Scenario Blueprint
+# =============================================================================
+# Use this template to create new abuse pattern scenarios for testing.
+#
+# QUICK START:
+# 1. Copy this file to a new name (e.g., "api-abuse.yaml")
+# 2. Update the metadata section with your attack pattern
+# 3. Configure fixture_config with users, IPs, devices
+# 4. Define your scenarios with event timelines
+# 5. Add abuse detection queries
+# 6. Generate fixtures: python src/scenario.py --name api-abuse
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. SCENARIO METADATA
+# -----------------------------------------------------------------------------
+name: "Your Attack Pattern Name"
+description: "Brief description of what this scenario demonstrates"
+
+metadata:
+  attack_type: "your_attack_type"  # Examples: session_sharing, credential_stuffing, api_abuse
+  severity: "high"  # Options: low, medium, high, critical
+
+  # Attack pattern definition
+  pattern:
+    description: "Detailed description of the attack pattern"
+    behavior:
+      - "Step 1: What the attacker does first"
+      - "Step 2: Follow-up actions"
+      - "Step 3: Final exploitation"
+    indicators:
+      - "Observable indicator #1 in the data"
+      - "Observable indicator #2 in the data"
+      - "Observable indicator #3 in the data"
+
+  # Detection rules (hints for graph queries)
+  detection_rules:
+    Session:
+      - pattern: "What to look for in Session nodes"
+        query_hint: "MATCH (e:Event)-[:IN_SESSION]->(s:Session) ..."
+
+    IPAddress:
+      - pattern: "What to look for in IPAddress nodes"
+        query_hint: "MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress) ..."
+
+    User:
+      - pattern: "What to look for in User nodes"
+        query_hint: "MATCH (e:Event)-[:PERFORMED_BY]->(u:User) ..."
+
+    Event:
+      - pattern: "What to look for in Event nodes directly"
+        query_hint: "MATCH (e:Event {action: 'some_action'}) ..."
+
+# -----------------------------------------------------------------------------
+# 2. FIXTURE GENERATION CONFIGURATION
+# -----------------------------------------------------------------------------
+fixture_config:
+  # Time range for generated events
+  time_range:
+    start: "2025-12-29T10:00:00Z"  # ISO 8601 format
+    end: "2025-12-29T12:00:00Z"
+    duration_hours: 2
+
+  # How many instances of this attack pattern to create
+  instances: 2
+
+  # Events per instance (optional)
+  events_per_instance:
+    min: 5
+    max: 15
+
+  # Stores to target
+  stores:
+    - id: "store-1"
+      weight: 0.7  # 70% of events
+    - id: "store-2"
+      weight: 0.3  # 30% of events
+
+  # Endpoints/actions to access
+  endpoints:
+    - path: "/api/v1/{store}/books"
+      method: "GET"
+      action: "view_books"
+      weight: 0.5  # Probability of this endpoint being used
+    - path: "/api/v1/{store}/books/{id}"
+      method: "GET"
+      action: "view_book_detail"
+      weight: 0.2
+    - path: "/api/v1/{store}/cart/add"
+      method: "POST"
+      action: "add_to_cart"
+      weight: 0.2
+    - path: "/api/v1/{store}/checkout"
+      method: "POST"
+      action: "checkout"
+      weight: 0.1
+
+  # User accounts involved
+  users:
+    - user_id: 5001
+      email: "legitimate.user@example.com"
+      legitimate: true  # Mark legitimate vs attacker users
+    - user_id: 5002
+      email: "attacker1@example.com"
+      legitimate: false
+    - user_id: 5003
+      email: "attacker2@example.com"
+      legitimate: false
+
+  # IP addresses to use
+  ip_addresses:
+    - address: "192.168.1.100"
+      location: "New York, US"
+      type: "home_broadband"
+      legitimate: true
+    - address: "203.0.113.45"
+      location: "Unknown (VPN)"
+      type: "vpn"
+      legitimate: false
+    - address: "198.51.100.23"
+      location: "Proxy Network"
+      type: "proxy"
+      legitimate: false
+
+  # Device types and user agents
+  devices:
+    - device_type: "web"
+      user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0"
+      platform: "Windows Desktop"
+      weight: 0.4
+    - device_type: "mobile"
+      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"
+      platform: "iOS Mobile"
+      weight: 0.3
+    - device_type: "web"
+      user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+      platform: "Linux (Suspicious)"
+      weight: 0.3
+
+  # Query string generation (for URL query parameters)
+  # This makes fixtures more realistic by adding random query strings
+  query_generation:
+    enabled: true
+    probability: 0.2  # 20% of events will have query strings (1 in 5)
+    templates:
+      # Define query string templates for each action type
+      auth_token_validated:
+        - "?redirect=/books"
+        - "?remember=true"
+      view_books:
+        - "?page=2"
+        - "?sort=price"
+        - "?category=fiction"
+        - "?limit=20"
+      view_book_detail:
+        - "?format=hardcover"
+        - "?reviews=true"
+      add_to_cart:
+        - "?quantity=2"
+        - "?gift=true"
+      view_cart:
+        - "?currency=USD"
+        - "?promo=SAVE10"
+      checkout:
+        - "?payment=card"
+        - "?shipping=express"
+
+# -----------------------------------------------------------------------------
+# 3. SCENARIOS (Specific Attack Instances)
+# -----------------------------------------------------------------------------
+# Define the actual attack timelines here. Each scenario is a specific instance
+# of the attack pattern with a concrete timeline of events.
+
+scenarios:
+  # Scenario 1: First attack instance
+  - name: "Attack Instance #1"
+    description: "Brief description of what happens in this instance"
+
+    # Optional: Session and auth token IDs (if applicable)
+    session_id: "01963852-a1b2-c3d4-e5f6-7a8b9c0d1e2f"  # UUID v7 format
+    auth_token_id: "token_example_123"
+
+    # Timeline of events
+    # Use timestamp_offset_minutes to define when each event occurs relative to start time
+    events:
+      # Event 1: Initial action
+      - timestamp_offset_minutes: 0
+        user_id: 5001
+        email: "legitimate.user@example.com"
+        client_ip: "192.168.1.100"
+        device_type: "web"
+        user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0"
+        action: "auth_token_validated"
+        status: "pass"  # Options: pass, fail, null
+        store_id: "store-1"
+        path: "/api/v1/store-1/auth/validate"
+        query: "?redirect=/books"  # Optional: explicit query string
+        description: "Legitimate user authenticates"
+
+      # Event 2: Normal activity
+      - timestamp_offset_minutes: 2
+        user_id: 5001
+        client_ip: "192.168.1.100"
+        device_type: "web"
+        action: "view_books"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books"
+        description: "Normal browsing"
+
+      # Event 3: SUSPICIOUS activity begins
+      - timestamp_offset_minutes: 5
+        user_id: 5002  # DIFFERENT USER or DIFFERENT IP or DIFFERENT DEVICE
+        email: "attacker1@example.com"
+        client_ip: "203.0.113.45"  # DIFFERENT IP
+        device_type: "mobile"  # DIFFERENT DEVICE
+        user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"
+        action: "view_books"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books"
+        description: "⚠️ SUSPICIOUS: Attack pattern indicator here"
+
+      # Event 4: Attack continues
+      - timestamp_offset_minutes: 7
+        user_id: 5002
+        client_ip: "203.0.113.45"
+        device_type: "mobile"
+        action: "add_to_cart"
+        store_id: "store-1"
+        path: "/api/v1/store-1/cart/add"
+        description: "Attacker taking malicious action"
+
+      # Event 5: Attack completion
+      - timestamp_offset_minutes: 10
+        user_id: 5003  # THIRD ACTOR
+        client_ip: "198.51.100.23"  # THIRD IP
+        device_type: "web"
+        action: "checkout"
+        store_id: "store-1"
+        path: "/api/v1/store-1/checkout"
+        query: "?payment=card&shipping=express"
+        description: "⚠️ CRITICAL: Final attack step"
+
+  # Scenario 2: Second attack instance (optional)
+  - name: "Attack Instance #2"
+    session_id: "01963852-b2c3-d4e5-f6a7-8b9c0d1e2f3a"
+    auth_token_id: "token_example_456"
+
+    events:
+      - timestamp_offset_minutes: 20
+        user_id: 5001
+        client_ip: "192.168.1.100"
+        device_type: "web"
+        action: "auth_token_validated"
+        status: "pass"
+        store_id: "store-2"
+        path: "/api/v1/store-2/auth/validate"
+        description: "Second instance of attack pattern"
+
+      # Add more events following the same pattern...
+
+# -----------------------------------------------------------------------------
+# 4. EXPECTED GRAPH STRUCTURE
+# -----------------------------------------------------------------------------
+# Document what the Neo4j graph should look like after loading this data
+
+expected_graph:
+  nodes:
+    Event:
+      count: "~30-50"  # Approximate count
+      key_properties:
+        - event_id
+        - action
+        - timestamp
+        - session_id
+        - user_id
+        - client_ip
+        - device_type
+        - store_id
+
+    Session:
+      count: 2
+      suspicious_pattern: "What makes sessions suspicious in this scenario"
+
+    User:
+      count: 3
+      suspicious_pattern: "What makes users suspicious in this scenario"
+
+    IPAddress:
+      count: 3
+      suspicious_pattern: "What makes IPs suspicious in this scenario"
+
+    Store:
+      count: 2
+
+  relationships:
+    IN_SESSION:
+      pattern: "Events → Session (describe the pattern here)"
+      count: "~30-50"
+
+    PERFORMED_BY:
+      pattern: "Events → User (describe the pattern here)"
+      count: "~30-50"
+
+    ORIGINATED_FROM:
+      pattern: "Events → IPAddress (describe the pattern here)"
+      count: "~30-50"
+
+    TARGETED_STORE:
+      pattern: "Events → Store"
+      count: "~30-50"
+
+# -----------------------------------------------------------------------------
+# 5. ABUSE DETECTION QUERIES
+# -----------------------------------------------------------------------------
+# Cypher queries to detect this abuse pattern in the graph
+
+abuse_assertions:
+  # Query 1: Primary detection query
+  - name: "Detect primary abuse indicator"
+    query: |
+      MATCH (e:Event)-[:IN_SESSION]->(s:Session)
+      WHERE e.timestamp > datetime() - duration('PT1H')
+      WITH s.session_id as session_id,
+           collect(DISTINCT e.user_id) as user_ids
+      WHERE size(user_ids) > 1
+      RETURN session_id, user_ids
+    expected_result_count: 2
+    description: "Should find sessions with suspicious patterns"
+
+  # Query 2: Secondary detection query
+  - name: "Detect secondary abuse indicator"
+    query: |
+      MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress)
+      WHERE e.timestamp > datetime() - duration('PT2H')
+      WITH ip.address as ip_address,
+           collect(DISTINCT e.user_id) as user_ids,
+           count(e) as event_count
+      WHERE size(user_ids) > 1
+      RETURN ip_address, user_ids, event_count
+      ORDER BY event_count DESC
+    expected_result_count: ">= 1"
+    description: "Should find IPs showing suspicious behavior"
+
+  # Query 3: Timeline/temporal query
+  - name: "Show attack timeline"
+    query: |
+      MATCH (e:Event)
+      WHERE e.session_id = '01963852-a1b2-c3d4-e5f6-7a8b9c0d1e2f'
+      RETURN e.timestamp, e.user_id, e.client_ip, e.action, e.device_type
+      ORDER BY e.timestamp
+    expected_result_count: ">= 5"
+    description: "Should show temporal progression of attack"
+
+  # Query 4: Aggregate metrics
+  - name: "Calculate attack metrics"
+    query: |
+      MATCH (e:Event {action: 'some_action'})
+      WHERE e.timestamp > datetime() - duration('PT2H')
+      WITH count(DISTINCT e.client_ip) as ip_count,
+           count(DISTINCT e.user_id) as user_count,
+           count(e) as total_events
+      RETURN ip_count, user_count, total_events
+    expected_result_count: 1
+    description: "Should provide aggregate attack statistics"
+
+# -----------------------------------------------------------------------------
+# 6. GENERATOR CONFIGURATION
+# -----------------------------------------------------------------------------
+# Settings for the Python fixture generator
+
+generator_config:
+  strategy: "scenario_based"  # Generate events based on scenarios list
+
+  # How to generate timestamps
+  timestamp_generation:
+    method: "offset_based"  # Use timestamp_offset_minutes from each event
+    base_time: "${fixture_config.time_range.start}"
+    jitter_seconds: 5  # Add random jitter ±5 seconds for realism
+
+  # How to generate event_ids
+  event_id_generation:
+    method: "uuid_v7"  # Time-ordered UUIDs (recommended)
+
+  # Additional events to add (noise/legitimate traffic)
+  noise_events:
+    enabled: true
+    count: 30  # Number of legitimate events to add
+    description: "Add legitimate events from other users to make pattern realistic"
+
+  # Validation checks
+  validation:
+    - check: "Each scenario creates events for all users in timeline"
+    - check: "Same session_id used across all events in scenario (if applicable)"
+    - check: "Timestamps are monotonically increasing within scenario"
+    - check: "All required fields present in generated events"
+
+# -----------------------------------------------------------------------------
+# 7. OUTPUT FORMAT
+# -----------------------------------------------------------------------------
+# Defines the output file format and schema
+
+output:
+  format: "json"  # Array of event objects
+  file: "your-scenario-events.json"
+
+  # Event structure (Neo4j v2.0 model - DO NOT MODIFY)
+  event_schema:
+    event_id: "string (UUID v7)"
+    action: "string"
+    status: "string | null"
+    timestamp: "string (ISO 8601)"
+    client_ip: "string"
+    user_agent: "string"
+    device_type: "string"
+    path: "string"
+    query: "string | null"
+    session_id: "string (UUID v7) | null"
+    user_id: "integer"
+    email: "string | null"
+    store_id: "string"
+    auth_token_id: "string | null"
+    data: "json | null"
+    archived: "boolean"
+
+# =============================================================================
+# NOTES AND TIPS
+# =============================================================================
+#
+# EVENT FIELD GUIDELINES:
+# - event_id: Auto-generated UUID v7 (time-ordered)
+# - action: Required - describes what happened (view_books, checkout, etc.)
+# - status: Optional - use for auth/validation events (pass/fail)
+# - timestamp: Auto-generated from offset_minutes + jitter
+# - client_ip: Required - source IP address
+# - user_agent: Recommended - browser/client identification
+# - device_type: Recommended - web, mobile, api, etc.
+# - path: Required - URL path accessed
+# - query: Optional - URL query string (can be auto-generated)
+# - session_id: Optional - groups events by session
+# - user_id: Required - user identifier
+# - email: Optional - user email (denormalized for convenience)
+# - store_id: Required - which store/tenant
+# - auth_token_id: Optional - authentication token identifier
+# - data: Optional - additional JSON data
+#
+# ABUSE PATTERN TIPS:
+# - Session Sharing: Same session_id, different user_ids and IPs
+# - Credential Stuffing: Multiple IPs, multiple users, many failed auths
+# - Device Switching: Same session_id, different device_types rapidly
+# - API Abuse: High event count from single IP/user in short time
+# - Account Takeover: Successful auth from suspicious IP, then profile changes
+# - Bot Activity: High velocity, regular timing patterns, suspicious user agents
+#
+# TESTING YOUR SCENARIO:
+# 1. Generate fixtures: python src/scenario.py --name your-scenario --verbose
+# 2. Review output JSON: cat scenarios/fixtures/your-scenario-events.json | jq
+# 3. Load into Neo4j: Use LOAD CSV or Neo4j import tools
+# 4. Run detection queries: Copy from abuse_assertions section
+# 5. Verify expected patterns are detected
+#
+# =============================================================================

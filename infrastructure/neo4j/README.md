@@ -237,3 +237,16 @@ docker volume rm naglfar-analytics_neo4j-data
 # Start fresh (will auto-initialize)
 docker-compose up -d
 ```
+
+## More Scenarios
+
+```sh
+  1. brute-force-attack.yaml - Multiple failed auth attempts from same IP
+  2. ddos-attack.yaml - Excessive requests from single IP
+  3. session-sharing.yaml - Same session used by multiple users
+  4. credential-stuffing.yaml - Multiple IPs trying many user accounts
+  5. token-abuse.yaml - Single auth token used across different sessions/IPs
+  6. flow-anomaly.yaml - Auth validation without e-token creation (suspicious)
+  7. store-targeting.yaml - Focused attack on specific store endpoints
+  8. device-switching.yaml - Same session rapidly switching device types
+```

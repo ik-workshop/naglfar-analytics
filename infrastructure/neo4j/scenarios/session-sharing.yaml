@@ -128,6 +128,40 @@ fixture_config:
       user_agent: "Mozilla/5.0 (Linux; Android 10; SM-G973F)"
       weight: 0.1
 
+  # Query string generation (for URL query parameters)
+  query_generation:
+    enabled: true
+    probability: 0.2  # 20% of events will have query strings (1 in 5)
+    templates:
+      auth_token_validated:
+        - "?redirect=/books"
+        - "?remember=true"
+        - "?redirect=/cart"
+      view_books:
+        - "?page=2"
+        - "?sort=price"
+        - "?category=fiction"
+        - "?limit=20"
+        - "?search=mystery"
+        - "?filter=bestsellers"
+      view_book_detail:
+        - "?format=hardcover"
+        - "?reviews=true"
+        - "?preview=true"
+      add_to_cart:
+        - "?quantity=2"
+        - "?gift=true"
+        - "?quantity=1"
+      view_cart:
+        - "?currency=USD"
+        - "?promo=SAVE10"
+        - "?discount=WELCOME"
+      checkout:
+        - "?payment=card"
+        - "?shipping=express"
+        - "?gift_wrap=true"
+        - "?payment=paypal"
+
 # Session sharing scenarios (specific instances)
 scenarios:
   # Scenario 1: Compromised session shared among 3 users
@@ -154,6 +188,7 @@ scenarios:
         action: "view_books"
         store_id: "store-1"
         path: "/api/v1/store-1/books"
+        query: "?page=2&sort=price"
         description: "Legitimate browsing"
 
       - timestamp_offset_minutes: 5
@@ -190,6 +225,7 @@ scenarios:
         action: "checkout"
         store_id: "store-2"
         path: "/api/v1/store-2/checkout"
+        query: "?payment=card&shipping=express"
         description: "Victim completes fraudulent checkout"
 
   # Scenario 2: Another compromised session
@@ -322,7 +358,7 @@ generator_config:
   # Additional events to add (noise)
   noise_events:
     enabled: true
-    count: 20
+    count: 50
     description: "Add legitimate events from other users to make pattern realistic"
 
   # Validation

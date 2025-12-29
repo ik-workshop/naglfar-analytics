@@ -1,0 +1,471 @@
+name: "Device Switching Attack"
+description: "Demonstrates abuse detection: Same session rapidly switching device types and user agents"
+
+metadata:
+  attack_type: "device_switching"
+  severity: "high"
+
+  # Attack pattern definition
+  pattern:
+    description: "Single session showing impossible device type switching patterns"
+    behavior:
+      - "Legitimate user starts session on web browser"
+      - "Attacker hijacks session and uses it from mobile device"
+      - "Rapid switching between web and mobile (seconds/minutes apart)"
+      - "User agents change inconsistently with device types"
+      - "Potentially different geographic locations (IP changes)"
+    indicators:
+      - "Same session_id with multiple device_type values"
+      - "Device type changes within impossible timeframes"
+      - "User agent inconsistent with device type"
+      - "Geographic impossibility (session in NYC then London 5 mins later)"
+      - "Session accessed from multiple IPs with different device types"
+
+  # Detection rules (what to look for in graph)
+  detection_rules:
+    Session:
+      - pattern: "session_id with multiple device types in short time"
+        query_hint: "MATCH (e:Event)-[:IN_SESSION]->(s:Session) WHERE e.device_type IS NOT NULL WITH s, collect(DISTINCT e.device_type) as devices WHERE size(devices) > 1"
+
+    Event:
+      - pattern: "rapid device switching in timeline"
+        query_hint: "MATCH (e:Event)-[:IN_SESSION]->(s:Session) WITH s, e ORDER BY e.timestamp RETURN s.session_id, collect({time: e.timestamp, device: e.device_type})"
+
+    IPAddress:
+      - pattern: "same session from different IPs with different devices"
+        query_hint: "MATCH (e:Event)-[:IN_SESSION]->(s:Session), (e)-[:ORIGINATED_FROM]->(ip:IPAddress) WITH s, collect(DISTINCT {ip: ip.address, device: e.device_type}) as combos WHERE size(combos) > 2"
+
+# Fixture generation configuration
+fixture_config:
+  # Time range for generated events
+  time_range:
+    start: "2025-12-29T18:00:00Z"
+    end: "2025-12-29T19:00:00Z"
+    duration_hours: 1
+
+  # Number of compromised sessions
+  compromised_sessions: 2
+
+  # Events per session
+  events_per_session:
+    min: 10
+    max: 20
+
+  # Stores
+  stores:
+    - id: "store-1"
+      weight: 0.7
+    - id: "store-2"
+      weight: 0.3
+
+  # Legitimate user devices
+  legitimate_devices:
+    - device_type: "web"
+      user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0"
+      platform: "Windows Desktop"
+    - device_type: "web"
+      user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Safari/605.1.15"
+      platform: "MacOS Desktop"
+    - device_type: "mobile"
+      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148"
+      platform: "iOS Mobile"
+    - device_type: "mobile"
+      user_agent: "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile"
+      platform: "Android Mobile"
+
+  # Attacker devices (used when hijacking)
+  attacker_devices:
+    - device_type: "mobile"
+      user_agent: "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36"
+      platform: "Android (Emulator)"
+    - device_type: "web"
+      user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+      platform: "Linux Desktop (Suspicious)"
+    - device_type: "mobile"
+      user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X)"
+      platform: "iOS (Jailbroken)"
+
+  # IP addresses
+  ips:
+    legitimate:
+      - address: "73.225.100.50"
+        location: "New York, USA"
+        type: "home_broadband"
+      - address: "98.207.45.123"
+        location: "San Francisco, USA"
+        type: "home_broadband"
+
+    attacker:
+      - address: "185.220.101.45"
+        location: "Germany (VPN)"
+        type: "vpn"
+      - address: "103.89.234.56"
+        location: "Singapore (Proxy)"
+        type: "proxy"
+      - address: "45.142.212.99"
+        location: "Netherlands (Datacenter)"
+        type: "datacenter"
+
+  # Users
+  users:
+    - user_id: 3001
+      email: "alice.thompson@example.com"
+      legitimate: true
+    - user_id: 3002
+      email: "bob.martinez@example.com"
+      legitimate: true
+
+  # Query string generation (for URL query parameters)
+  query_generation:
+    enabled: true
+    probability: 0.2  # 20% of events will have query strings (1 in 5)
+    templates:
+      auth_token_validated:
+        - "?redirect=/books"
+        - "?remember=true"
+        - "?session_restore=true"
+      view_books:
+        - "?page=1"
+        - "?sort=newest"
+        - "?category=fiction"
+        - "?limit=25"
+      view_book_detail:
+        - "?reviews=true"
+        - "?format=ebook"
+      add_to_cart:
+        - "?quantity=1"
+        - "?gift=false"
+      view_cart:
+        - "?currency=USD"
+      checkout:
+        - "?payment=card"
+        - "?shipping=standard"
+        - "?gift_wrap=false"
+      view_orders:
+        - "?status=recent"
+        - "?limit=10"
+
+# Device switching scenarios
+scenarios:
+  # Scenario 1: Session hijacked - rapid device switching
+  - name: "Hijacked Session #1 - Rapid Device Switching"
+    session_id: "01963852-a1b2-9e8f-d3c4-5e6f7a8b9c0d"
+    auth_token_id: "token_hijacked_3001"
+    user_id: 3001
+    email: "alice.thompson@example.com"
+
+    events:
+      # Legitimate user starts session on Windows desktop
+      - timestamp_offset_minutes: 0
+        client_ip: "73.225.100.50"
+        device_type: "web"
+        user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0"
+        action: "auth_token_validated"
+        status: "pass"
+        store_id: "store-1"
+        path: "/api/v1/store-1/auth/validate"
+        description: "Legitimate user authenticates on Windows"
+
+      - timestamp_offset_minutes: 1
+        client_ip: "73.225.100.50"
+        device_type: "web"
+        user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0"
+        action: "view_books"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books"
+        query: "?page=1&sort=newest"
+        description: "Normal browsing"
+
+      - timestamp_offset_minutes: 2
+        client_ip: "73.225.100.50"
+        device_type: "web"
+        user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0"
+        action: "view_book_detail"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books/42"
+        description: "Normal browsing"
+
+      # SUSPICIOUS: Same session suddenly from mobile device, different IP (3 mins later)
+      - timestamp_offset_minutes: 5
+        client_ip: "185.220.101.45"  # DIFFERENT IP (VPN)
+        device_type: "mobile"  # DIFFERENT DEVICE TYPE
+        user_agent: "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36"
+        action: "view_cart"
+        store_id: "store-1"
+        path: "/api/v1/store-1/cart"
+        description: "SUSPICIOUS: Device switched from web to mobile, IP changed"
+
+      - timestamp_offset_minutes: 6
+        client_ip: "185.220.101.45"
+        device_type: "mobile"
+        user_agent: "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36"
+        action: "add_to_cart"
+        store_id: "store-1"
+        path: "/api/v1/store-1/cart/add"
+        description: "Attacker using hijacked session"
+
+      # VERY SUSPICIOUS: Switches BACK to web device 2 mins later (impossible)
+      - timestamp_offset_minutes: 8
+        client_ip: "103.89.234.56"  # THIRD IP (Proxy)
+        device_type: "web"  # BACK TO WEB
+        user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"  # Different browser
+        action: "view_cart"
+        store_id: "store-2"
+        path: "/api/v1/store-2/cart"
+        description: "VERY SUSPICIOUS: Rapid device switch back to web, different IP/browser"
+
+      - timestamp_offset_minutes: 9
+        client_ip: "103.89.234.56"
+        device_type: "web"
+        user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+        action: "add_to_cart"
+        store_id: "store-2"
+        path: "/api/v1/store-2/cart/add"
+        description: "Suspicious activity continues"
+
+      # Switches to mobile AGAIN (4th device type change in 12 minutes)
+      - timestamp_offset_minutes: 12
+        client_ip: "45.142.212.99"  # FOURTH IP
+        device_type: "mobile"  # BACK TO MOBILE
+        user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X)"
+        action: "checkout"
+        store_id: "store-2"
+        path: "/api/v1/store-2/checkout"
+        query: "?payment=card&shipping=standard"
+        description: "CRITICAL: 4th device switch in 12 mins - fraudulent checkout attempt"
+
+      # Legitimate user back on original device (realizes account compromised)
+      - timestamp_offset_minutes: 15
+        client_ip: "73.225.100.50"  # Original IP
+        device_type: "web"  # Original device
+        user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0"
+        action: "view_orders"
+        store_id: "store-1"
+        path: "/api/v1/store-1/orders"
+        description: "Legitimate user sees unauthorized orders"
+
+  # Scenario 2: Another hijacked session with device switching
+  - name: "Hijacked Session #2 - Mobile to Web Switch"
+    session_id: "01963852-b2c3-0f9g-e4d5-6f7g8h9i0j1k"
+    auth_token_id: "token_hijacked_3002"
+    user_id: 3002
+    email: "bob.martinez@example.com"
+
+    events:
+      # User starts on iPhone
+      - timestamp_offset_minutes: 20
+        client_ip: "98.207.45.123"
+        device_type: "mobile"
+        user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"
+        action: "auth_token_validated"
+        status: "pass"
+        store_id: "store-1"
+        path: "/api/v1/store-1/auth/validate"
+        description: "User authenticates on iPhone"
+
+      - timestamp_offset_minutes: 21
+        client_ip: "98.207.45.123"
+        device_type: "mobile"
+        user_agent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15"
+        action: "view_books"
+        store_id: "store-1"
+        path: "/api/v1/store-1/books"
+        description: "Normal mobile browsing"
+
+      # SUSPICIOUS: Suddenly on desktop 3 mins later, different IP
+      - timestamp_offset_minutes: 24
+        client_ip: "185.220.101.45"  # VPN IP
+        device_type: "web"  # DEVICE SWITCH
+        user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+        action: "add_to_cart"
+        store_id: "store-1"
+        path: "/api/v1/store-1/cart/add"
+        description: "SUSPICIOUS: Device switched mobile→web, IP changed"
+
+      - timestamp_offset_minutes: 25
+        client_ip: "185.220.101.45"
+        device_type: "web"
+        user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+        action: "checkout"
+        store_id: "store-1"
+        path: "/api/v1/store-1/checkout"
+        description: "Fraudulent checkout from hijacked session"
+
+# Expected Neo4j graph structure
+expected_graph:
+  nodes:
+    Event:
+      count: "~25-40"
+      key_properties:
+        - event_id
+        - action
+        - timestamp
+        - session_id
+        - user_id
+        - client_ip
+        - device_type
+        - user_agent
+        - store_id
+
+    Session:
+      count: 2  # Two hijacked sessions
+      suspicious_pattern: "Multiple device_type values per session"
+
+    User:
+      count: 2  # Two victim users
+
+    IPAddress:
+      count: 5  # Legitimate IPs + attacker IPs
+      suspicious_pattern: "Same session from different IPs with different device types"
+
+    Store:
+      count: 2
+
+  relationships:
+    IN_SESSION:
+      pattern: "Events → Session (same session, changing device types)"
+      count: "~25-40"
+
+    PERFORMED_BY:
+      pattern: "Events → User (same user, multiple device types)"
+      count: "~25-40"
+
+    ORIGINATED_FROM:
+      pattern: "Events → IPAddress (session from multiple IPs)"
+      count: "~25-40"
+
+    TARGETED_STORE:
+      pattern: "Events → Store"
+      count: "~25-40"
+
+# Abuse detection queries
+abuse_assertions:
+  - name: "Detect sessions with multiple device types"
+    query: |
+      MATCH (e:Event)-[:IN_SESSION]->(s:Session)
+      WHERE e.device_type IS NOT NULL
+      WITH s.session_id as session_id,
+           collect(DISTINCT e.device_type) as device_types
+      WHERE size(device_types) > 1
+      RETURN session_id, device_types, size(device_types) as device_count
+      ORDER BY device_count DESC
+    expected_result_count: 2
+    description: "Should find 2 sessions with multiple device types"
+
+  - name: "Detect rapid device switching timeline"
+    query: |
+      MATCH (e:Event)-[:IN_SESSION]->(s:Session {session_id: '01963852-a1b2-9e8f-d3c4-5e6f7a8b9c0d'})
+      WHERE e.device_type IS NOT NULL
+      WITH e
+      ORDER BY e.timestamp
+      RETURN e.timestamp, e.device_type, e.user_agent, e.client_ip, e.action
+    expected_result_count: ">= 8"
+    description: "Should show timeline of device switches for session #1"
+
+  - name: "Detect sessions with multiple IPs and device types"
+    query: |
+      MATCH (e:Event)-[:IN_SESSION]->(s:Session)
+      WHERE e.device_type IS NOT NULL
+      WITH s.session_id as session_id,
+           collect(DISTINCT e.client_ip) as ips,
+           collect(DISTINCT e.device_type) as devices
+      WHERE size(ips) > 2 AND size(devices) > 1
+      RETURN session_id, ips, devices,
+             size(ips) as ip_count,
+             size(devices) as device_count
+    expected_result_count: ">= 1"
+    description: "Should find sessions with multiple IPs AND multiple device types"
+
+  - name: "Calculate device switch frequency"
+    query: |
+      MATCH (e:Event)-[:IN_SESSION]->(s:Session)
+      WHERE e.device_type IS NOT NULL
+      WITH s, e
+      ORDER BY s.session_id, e.timestamp
+      WITH s.session_id as session_id,
+           collect(e.device_type) as device_sequence,
+           collect(e.timestamp) as time_sequence
+      WITH session_id, device_sequence, time_sequence,
+           [i IN range(1, size(device_sequence)-1) |
+            CASE WHEN device_sequence[i] <> device_sequence[i-1]
+            THEN 1 ELSE 0 END] as switches
+      WITH session_id,
+           reduce(total = 0, switch IN switches | total + switch) as switch_count,
+           duration.inSeconds(
+             time_sequence[0],
+             time_sequence[size(time_sequence)-1]
+           ).seconds as duration_seconds
+      WHERE switch_count > 0
+      RETURN session_id, switch_count,
+             duration_seconds / 60.0 as duration_minutes,
+             round(switch_count * 60.0 / duration_seconds, 2) as switches_per_minute
+      ORDER BY switches_per_minute DESC
+    expected_result_count: ">= 1"
+    description: "Should calculate device switching frequency (switches per minute)"
+
+  - name: "Detect impossible geographic switches"
+    query: |
+      MATCH (e:Event)-[:IN_SESSION]->(s:Session)
+      MATCH (e)-[:ORIGINATED_FROM]->(ip:IPAddress)
+      WITH s.session_id as session_id,
+           e.timestamp as timestamp,
+           ip.address as ip_address,
+           e.device_type as device_type
+      ORDER BY session_id, timestamp
+      WITH session_id,
+           collect({time: timestamp, ip: ip_address, device: device_type}) as events
+      WHERE size(events) > 3
+      RETURN session_id, events
+    expected_result_count: ">= 1"
+    description: "Should show geographic/device impossibility patterns"
+
+# Python fixture generator hints
+generator_config:
+  strategy: "scenario_based"
+
+  # How to generate timestamps
+  timestamp_generation:
+    method: "offset_based"
+    base_time: "${fixture_config.time_range.start}"
+    jitter_seconds: 2
+
+  # How to generate event_ids
+  event_id_generation:
+    method: "uuid_v7"
+
+  # Additional events to add (noise)
+  noise_events:
+    enabled: true
+    count: 50
+    description: "Add normal events from legitimate sessions (no device switching)"
+
+  # Validation
+  validation:
+    - check: "Sessions have multiple device_type values"
+    - check: "Device switches happen within minutes"
+    - check: "Same session_id across all events in scenario"
+    - check: "Timeline shows rapid switching pattern"
+    - check: "At least 3 device type changes per compromised session"
+
+# Output format
+output:
+  format: "json"
+  file: "device-switching-events.json"
+
+  # Event structure (maps to Neo4j v2.0 model)
+  event_schema:
+    event_id: "string (UUID v7)"
+    action: "string"
+    status: "string | null"
+    timestamp: "string (ISO 8601)"
+    client_ip: "string"
+    user_agent: "string"
+    device_type: "string"
+    path: "string"
+    query: "string | null"
+    session_id: "string (UUID v7)"
+    user_id: "integer"
+    email: "string"
+    store_id: "string"
+    auth_token_id: "string"
+    data: "json | null"
