@@ -74,6 +74,13 @@ Generate and load realistic test data for development and testing.
 **Install dependencies:**
 ```bash
 pip install -r requirements.txt
+
+python3 -m venv .venv
+source .venv/bin/activate && pip install -r requirements.txt
+
+pipenv shell
+pipens sync
+pipenv run pip list
 ```
 
 **Generate test data:**
