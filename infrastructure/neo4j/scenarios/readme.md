@@ -290,10 +290,78 @@ scenarios/
     └── device-switching-events.json
 ```
 
+## Testing Workflow
+
+### End-to-End Testing
+
+```bash
+# 1. Generate fixtures from scenario
+python src/scenario.py --name session-sharing --verbose
+
+# 2. Load fixtures into Neo4j
+python src/load.py --input scenarios/fixtures/session-sharing-events.json --batch-size 500
+
+# 3. Run abuse detection assertions
+python src/assertions.py --name session-sharing --verbose
+
+# All tests passing example output:
+# ✅ PASS: Detect sessions with multiple users
+# ✅ PASS: Detect auth tokens used from multiple IPs
+# ✅ PASS: Detect suspicious IP behavior
+# ✅ PASS: Detect rapid user switching in session
+# 🎉 All assertions passed!
+```
+
+### Assertion Runner (`src/assertions.py`)
+
+Automatically executes all abuse detection queries from scenario YAML files and validates results:
+
+**Features:**
+- Loads `abuse_assertions` from scenario files
+- Executes Cypher queries against Neo4j
+- Validates result counts against expectations
+- Reports pass/fail with descriptions
+- Supports comparison operators: `==`, `>=`, `>`, `<=`, `<`
+- Returns exit code 0 (success) or 1 (failure)
+
+**Expected Count Formats:**
+```yaml
+expected_result_count: 2        # Exactly 2 results
+expected_result_count: ">= 1"   # At least 1 result
+expected_result_count: ">= 3"   # At least 3 results
+```
+
+**Usage:**
+```bash
+# Run assertions for a scenario
+python src/assertions.py --name session-sharing
+
+# Verbose output (shows queries and sample results)
+python src/assertions.py --name credential-stuffing --verbose
+
+# Custom Neo4j connection
+python src/assertions.py \
+  --name device-switching \
+  --uri bolt://production:7687 \
+  --password different_password
+```
+
+### Quick Test All Scenarios
+
+```bash
+# Test all scenarios in sequence
+for scenario in session-sharing credential-stuffing device-switching; do
+  echo "Testing $scenario..."
+  python src/scenario.py --name $scenario
+  python src/load.py --input scenarios/fixtures/${scenario}-events.json
+  python src/assertions.py --name $scenario || echo "❌ $scenario failed"
+done
+```
+
 ## Next Steps
 
 1. **Generate fixtures**: Run `python src/scenario.py --name <scenario>`
-2. **Load into Neo4j**: Use generated JSON files with Neo4j import tools
-3. **Run detection queries**: Execute Cypher queries from `abuse_assertions` sections
+2. **Load into Neo4j**: Run `python src/load.py --input scenarios/fixtures/<scenario>-events.json`
+3. **Run assertions**: Run `python src/assertions.py --name <scenario>`
 4. **Analyze patterns**: Visualize graph relationships in Neo4j Browser
 5. **Tune detection**: Adjust thresholds based on false positive rates

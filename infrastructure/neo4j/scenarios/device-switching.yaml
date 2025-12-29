@@ -367,12 +367,12 @@ abuse_assertions:
       MATCH (e:Event)-[:IN_SESSION]->(s:Session)
       WHERE e.device_type IS NOT NULL
       WITH s.session_id as session_id,
-           collect(DISTINCT e.client_ip) as ips,
-           collect(DISTINCT e.device_type) as devices
+          collect(DISTINCT e.client_ip) as ips,
+          collect(DISTINCT e.device_type) as devices
       WHERE size(ips) > 2 AND size(devices) > 1
       RETURN session_id, ips, devices,
-             size(ips) as ip_count,
-             size(devices) as device_count
+            size(ips) as ip_count,
+            size(devices) as device_count
     expected_result_count: ">= 1"
     description: "Should find sessions with multiple IPs AND multiple device types"
 
@@ -383,22 +383,22 @@ abuse_assertions:
       WITH s, e
       ORDER BY s.session_id, e.timestamp
       WITH s.session_id as session_id,
-           collect(e.device_type) as device_sequence,
-           collect(e.timestamp) as time_sequence
+          collect(e.device_type) as device_sequence,
+          collect(e.timestamp) as time_sequence
       WITH session_id, device_sequence, time_sequence,
-           [i IN range(1, size(device_sequence)-1) |
+          [i IN range(1, size(device_sequence)-1) |
             CASE WHEN device_sequence[i] <> device_sequence[i-1]
             THEN 1 ELSE 0 END] as switches
       WITH session_id,
-           reduce(total = 0, switch IN switches | total + switch) as switch_count,
-           duration.inSeconds(
-             time_sequence[0],
-             time_sequence[size(time_sequence)-1]
-           ).seconds as duration_seconds
+          reduce(total = 0, switch IN switches | total + switch) as switch_count,
+          duration.inSeconds(
+            time_sequence[0],
+            time_sequence[size(time_sequence)-1]
+          ).seconds as duration_seconds
       WHERE switch_count > 0
       RETURN session_id, switch_count,
-             duration_seconds / 60.0 as duration_minutes,
-             round(switch_count * 60.0 / duration_seconds, 2) as switches_per_minute
+            duration_seconds / 60.0 as duration_minutes,
+            round(switch_count * 60.0 / duration_seconds, 2) as switches_per_minute
       ORDER BY switches_per_minute DESC
     expected_result_count: ">= 1"
     description: "Should calculate device switching frequency (switches per minute)"
@@ -408,12 +408,12 @@ abuse_assertions:
       MATCH (e:Event)-[:IN_SESSION]->(s:Session)
       MATCH (e)-[:ORIGINATED_FROM]->(ip:IPAddress)
       WITH s.session_id as session_id,
-           e.timestamp as timestamp,
-           ip.address as ip_address,
-           e.device_type as device_type
+          e.timestamp as timestamp,
+          ip.address as ip_address,
+          e.device_type as device_type
       ORDER BY session_id, timestamp
       WITH session_id,
-           collect({time: timestamp, ip: ip_address, device: device_type}) as events
+          collect({time: timestamp, ip: ip_address, device: device_type}) as events
       WHERE size(events) > 3
       RETURN session_id, events
     expected_result_count: ">= 1"
