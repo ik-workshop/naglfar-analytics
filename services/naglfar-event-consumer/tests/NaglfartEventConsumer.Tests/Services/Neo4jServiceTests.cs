@@ -76,14 +76,21 @@ public class Neo4jServiceTests
     [Fact]
     public void CreateEventBatchItem_WithAllFields_ShouldContainAllData()
     {
-        // Arrange
+        // Arrange - v2.0 model with all fields
         var jsonString = @"{
+            ""event_id"": ""550e8400-e29b-41d4-a716-446655440000"",
             ""session_id"": ""01963852-c3c4-7b4a-a9e3-7f8c5d6e4f3a"",
             ""store_id"": ""store-1"",
             ""action"": ""view_books"",
+            ""status"": ""pass"",
             ""timestamp"": ""2025-12-28T10:30:00.000Z"",
             ""user_id"": 123,
             ""auth_token_id"": ""abc123"",
+            ""client_ip"": ""192.168.1.100"",
+            ""user_agent"": ""Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X)"",
+            ""device_type"": ""mobile"",
+            ""path"": ""/api/v1/store-1/books"",
+            ""query"": ""page=1&limit=10"",
             ""data"": { ""category"": ""programming"" }
         }";
 
@@ -98,15 +105,22 @@ public class Neo4jServiceTests
             Action = "view_books"
         };
 
-        // Assert
+        // Assert - Verify all v2.0 fields
         Assert.NotNull(batchItem);
         Assert.Equal("browse", batchItem.Category);
         Assert.Equal("view_books", batchItem.Action);
         Assert.NotNull(batchItem.Event);
+        Assert.Equal("550e8400-e29b-41d4-a716-446655440000", batchItem.Event.GetString("event_id"));
         Assert.Equal("01963852-c3c4-7b4a-a9e3-7f8c5d6e4f3a", batchItem.Event.GetString("session_id"));
         Assert.Equal("store-1", batchItem.Event.GetString("store_id"));
         Assert.Equal(123, batchItem.Event.GetInt("user_id"));
         Assert.Equal("abc123", batchItem.Event.GetString("auth_token_id"));
+        Assert.Equal("192.168.1.100", batchItem.Event.GetString("client_ip"));
+        Assert.Equal("Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X)", batchItem.Event.GetString("user_agent"));
+        Assert.Equal("mobile", batchItem.Event.GetString("device_type"));
+        Assert.Equal("/api/v1/store-1/books", batchItem.Event.GetString("path"));
+        Assert.Equal("page=1&limit=10", batchItem.Event.GetString("query"));
+        Assert.Equal("pass", batchItem.Event.GetString("status"));
     }
 
     [Fact]
@@ -354,6 +368,150 @@ public class Neo4jServiceTests
         Assert.Contains("items", dataJson);
     }
 
+    [Fact]
+    public void EventBatchItem_AuthEventWithStatus_ShouldIncludeStatusField()
+    {
+        // Arrange - Auth event with status (v2.0 model)
+        var jsonString = @"{
+            ""event_id"": ""550e8400-e29b-41d4-a716-446655440001"",
+            ""action"": ""auth_token_validated"",
+            ""status"": ""fail"",
+            ""timestamp"": ""2025-12-28T10:30:00.000Z"",
+            ""client_ip"": ""203.0.113.45"",
+            ""user_agent"": ""Python-Requests/2.28.1"",
+            ""device_type"": ""web"",
+            ""path"": ""/api/v1/store-1/auth/login"",
+            ""store_id"": ""store-1""
+        }";
+
+        var properties = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonString);
+        var naglfartEvent = new NaglfartEvent { Properties = properties! };
+
+        // Act
+        var batchItem = new EventBatchItem
+        {
+            Event = naglfartEvent,
+            Category = "authentication",
+            Action = "auth_token_validated"
+        };
+
+        // Assert
+        Assert.Equal("auth_token_validated", batchItem.Event.GetString("action"));
+        Assert.Equal("fail", batchItem.Event.GetString("status"));
+        Assert.Equal("203.0.113.45", batchItem.Event.GetString("client_ip"));
+        Assert.Equal("web", batchItem.Event.GetString("device_type"));
+    }
+
+    [Theory]
+    [InlineData("mobile", "Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X)")]
+    [InlineData("web", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")]
+    public void EventBatchItem_ShouldSupportDifferentDeviceTypes(string deviceType, string userAgent)
+    {
+        // Arrange - v2.0 model with device_type
+        var jsonString = @"{
+            ""event_id"": ""550e8400-e29b-41d4-a716-446655440002"",
+            ""action"": ""view_books"",
+            ""timestamp"": ""2025-12-28T10:30:00.000Z"",
+            ""client_ip"": ""192.168.1.100"",
+            ""user_agent"": """ + userAgent + @""",
+            ""device_type"": """ + deviceType + @""",
+            ""path"": ""/api/v1/store-1/books""
+        }";
+
+        var properties = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonString);
+        var naglfartEvent = new NaglfartEvent { Properties = properties! };
+
+        // Act
+        var batchItem = new EventBatchItem
+        {
+            Event = naglfartEvent,
+            Category = "browse",
+            Action = "view_books"
+        };
+
+        // Assert
+        Assert.Equal(deviceType, batchItem.Event.GetString("device_type"));
+        Assert.Equal(userAgent, batchItem.Event.GetString("user_agent"));
+    }
+
+    [Fact]
+    public void EventBatchItem_ETokenCreation_ShouldHaveRequiredFields()
+    {
+        // Arrange - E-token creation event (Layer 4)
+        var jsonString = @"{
+            ""event_id"": ""550e8400-e29b-41d4-a716-446655440003"",
+            ""action"": ""e_token_created"",
+            ""timestamp"": ""2025-12-28T10:30:00.000Z"",
+            ""client_ip"": ""192.168.1.100"",
+            ""user_agent"": ""Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"",
+            ""device_type"": ""web"",
+            ""path"": ""/api/v1/store-1/books"",
+            ""store_id"": ""store-1"",
+            ""data"": {
+                ""e_token_expiry"": ""2025-12-28T10:45:00.000Z"",
+                ""return_url"": ""https://api.example.com/api/v1/store-1/books""
+            }
+        }";
+
+        var properties = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonString);
+        var naglfartEvent = new NaglfartEvent { Properties = properties! };
+
+        // Act
+        var batchItem = new EventBatchItem
+        {
+            Event = naglfartEvent,
+            Category = "authentication",
+            Action = "e_token_created"
+        };
+
+        // Assert
+        Assert.Equal("e_token_created", batchItem.Event.GetString("action"));
+        Assert.Equal("store-1", batchItem.Event.GetString("store_id"));
+        Assert.Equal("192.168.1.100", batchItem.Event.GetString("client_ip"));
+        Assert.Equal("web", batchItem.Event.GetString("device_type"));
+        Assert.Null(batchItem.Event.GetString("status")); // No status for e_token events
+        Assert.Null(batchItem.Event.GetInt("user_id")); // No user_id (unauthenticated)
+    }
+
+    [Fact]
+    public void EventBatchItem_BruteForcePattern_ShouldCaptureFailedAttempts()
+    {
+        // Arrange - Multiple failed auth attempts (abuse detection pattern)
+        var batch = new List<EventBatchItem>();
+
+        for (int i = 0; i < 15; i++)
+        {
+            var jsonString = @"{
+                ""event_id"": ""550e8400-e29b-41d4-a716-44665544000" + i + @""",
+                ""action"": ""auth_token_validated"",
+                ""status"": ""fail"",
+                ""timestamp"": ""2025-12-28T10:30:" + i.ToString("D2") + @".000Z"",
+                ""client_ip"": ""203.0.113.45"",
+                ""user_agent"": ""Python-Requests/2.28.1"",
+                ""device_type"": ""web"",
+                ""path"": ""/api/v1/store-1/auth/login"",
+                ""store_id"": ""store-1""
+            }";
+
+            var properties = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonString);
+            batch.Add(new EventBatchItem
+            {
+                Event = new NaglfartEvent { Properties = properties! },
+                Category = "authentication",
+                Action = "auth_token_validated"
+            });
+        }
+
+        // Assert - All events should be failed auth from same IP
+        Assert.Equal(15, batch.Count);
+        foreach (var item in batch)
+        {
+            Assert.Equal("auth_token_validated", item.Event.GetString("action"));
+            Assert.Equal("fail", item.Event.GetString("status"));
+            Assert.Equal("203.0.113.45", item.Event.GetString("client_ip"));
+        }
+    }
+
     // Helper method to create test batches
     private List<EventBatchItem> CreateTestBatch(int size)
     {
@@ -362,9 +520,13 @@ public class Neo4jServiceTests
         for (int i = 0; i < size; i++)
         {
             var jsonString = @"{
+                ""event_id"": ""550e8400-e29b-41d4-a716-44665544" + i.ToString("D4") + @""",
                 ""session_id"": ""01963852-c3c4-7b4a-a9e3-7f8c5d6e4f3a"",
                 ""action"": ""view_books"",
-                ""timestamp"": ""2025-12-28T10:30:00.000Z""
+                ""timestamp"": ""2025-12-28T10:30:00.000Z"",
+                ""client_ip"": ""192.168.1.100"",
+                ""device_type"": ""web"",
+                ""path"": ""/api/v1/store-1/books""
             }";
 
             var properties = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonString);

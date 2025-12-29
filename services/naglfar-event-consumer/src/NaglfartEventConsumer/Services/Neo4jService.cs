@@ -24,16 +24,26 @@ public class Neo4jService : IAsyncDisposable
     }
 
     /// <summary>
-    /// Store an event in Neo4j as a graph structure
+    /// Store an event in Neo4j according to v2.0 graph model
+    /// Event-centric model: Events contain all data, entities are identity nodes only
     /// </summary>
     public async Task StoreEventAsync(NaglfartEvent eventData, string category)
     {
-        var sessionId = eventData.GetString("session_id");
-        var storeId = eventData.GetString("store_id");
-        var action = eventData.GetString("action");
+        // Extract all event properties
+        var eventId = eventData.GetString("event_id") ?? Guid.NewGuid().ToString();
+        var action = eventData.GetString("action") ?? "unknown";
+        var status = eventData.GetString("status");
         var timestamp = eventData.GetDateTime("timestamp") ?? DateTime.UtcNow;
+        var clientIp = eventData.GetString("client_ip") ?? "unknown";
+        var userAgent = eventData.GetString("user_agent");
+        var deviceType = eventData.GetString("device_type");
+        var path = eventData.GetString("path") ?? "/";
+        var query = eventData.GetString("query");
+        var sessionId = eventData.GetString("session_id");
         var userId = eventData.GetInt("user_id");
+        var storeId = eventData.GetString("store_id");
         var authTokenId = eventData.GetString("auth_token_id");
+        var data = eventData.HasProperty("data") ? eventData.Properties["data"].ToString() : null;
 
         await using var session = _driver.AsyncSession();
 
@@ -41,113 +51,112 @@ public class Neo4jService : IAsyncDisposable
         {
             await session.ExecuteWriteAsync(async tx =>
             {
-                // Create or merge Session node
-                await tx.RunAsync(@"
-                    MERGE (s:Session {session_id: $sessionId})
-                    ON CREATE SET s.created_at = datetime($timestamp)
-                    SET s.last_activity = datetime($timestamp)",
-                    new { sessionId, timestamp = timestamp.ToString("o") });
+                // Single comprehensive query that creates Event and all relationships
+                var result = await tx.RunAsync(@"
+                    // 1. Create Event node with all properties
+                    CREATE (e:Event {
+                        event_id: $eventId,
+                        action: $action,
+                        status: $status,
+                        timestamp: datetime($timestamp),
+                        client_ip: $clientIp,
+                        user_agent: $userAgent,
+                        device_type: $deviceType,
+                        path: $path,
+                        query: $query,
+                        session_id: $sessionId,
+                        user_id: $userId,
+                        store_id: $storeId,
+                        auth_token_id: $authTokenId,
+                        data: $data,
+                        archived: false
+                    })
 
-                // Create or merge Store node if store_id exists
-                if (!string.IsNullOrEmpty(storeId))
-                {
-                    await tx.RunAsync(@"
-                        MERGE (st:Store {store_id: $storeId})
-                        WITH st
-                        MATCH (s:Session {session_id: $sessionId})
-                        MERGE (s)-[:VISITED_STORE]->(st)",
-                        new { storeId, sessionId });
-                }
+                    // 2. MERGE IPAddress (always created)
+                    MERGE (ip:IPAddress {address: $clientIp})
+                    ON CREATE SET
+                        ip.first_seen = datetime($timestamp),
+                        ip.last_seen = datetime($timestamp)
+                    ON MATCH SET
+                        ip.last_seen = datetime($timestamp)
+                    CREATE (e)-[:ORIGINATED_FROM {timestamp: datetime($timestamp)}]->(ip)
 
-                // Create or merge User node if user_id exists
-                if (userId.HasValue)
-                {
-                    await tx.RunAsync(@"
-                        MERGE (u:User {user_id: $userId})
-                        WITH u
-                        MATCH (s:Session {session_id: $sessionId})
-                        MERGE (s)-[:BELONGS_TO_USER]->(u)",
-                        new { userId = userId.Value, sessionId });
-                }
-
-                // Create Event node with all properties
-                var eventProperties = new Dictionary<string, object>
-                {
-                    { "action", action ?? "unknown" },
-                    { "category", category },
-                    { "timestamp", timestamp.ToString("o") },
-                    { "session_id", sessionId ?? "" }
-                };
-
-                if (!string.IsNullOrEmpty(storeId))
-                    eventProperties["store_id"] = storeId;
-
-                if (userId.HasValue)
-                    eventProperties["user_id"] = userId.Value;
-
-                if (!string.IsNullOrEmpty(authTokenId))
-                    eventProperties["auth_token_id"] = authTokenId;
-
-                // Add data field if present
-                if (eventData.HasProperty("data"))
-                {
-                    var dataJson = eventData.Properties["data"].ToString();
-                    eventProperties["data"] = dataJson;
-                }
-
-                await tx.RunAsync(@"
-                    CREATE (e:Event $props)
+                    // 3. MERGE Session (if session_id exists)
                     WITH e
-                    MATCH (s:Session {session_id: $sessionId})
-                    CREATE (s)-[:HAS_EVENT]->(e)",
-                    new { props = eventProperties, sessionId });
+                    CALL {
+                        WITH e
+                        WITH e WHERE e.session_id IS NOT NULL
+                        MERGE (s:Session {session_id: e.session_id})
+                        ON CREATE SET
+                            s.created_at = datetime(e.timestamp),
+                            s.last_activity = datetime(e.timestamp)
+                        ON MATCH SET
+                            s.last_activity = datetime(e.timestamp)
+                        CREATE (e)-[:IN_SESSION {timestamp: datetime(e.timestamp)}]->(s)
+                    }
 
-                // Create relationship to Store if exists
-                if (!string.IsNullOrEmpty(storeId))
+                    // 4. MERGE User (if user_id exists)
+                    WITH e
+                    CALL {
+                        WITH e
+                        WITH e WHERE e.user_id IS NOT NULL
+                        MERGE (u:User {user_id: e.user_id})
+                        ON CREATE SET u.created_at = datetime(e.timestamp)
+                        CREATE (e)-[:PERFORMED_BY {timestamp: datetime(e.timestamp)}]->(u)
+                    }
+
+                    // 5. MERGE Store (if store_id exists)
+                    WITH e
+                    CALL {
+                        WITH e
+                        WITH e WHERE e.store_id IS NOT NULL
+                        MERGE (st:Store {store_id: e.store_id})
+                        ON CREATE SET st.created_at = datetime(e.timestamp)
+                        CREATE (e)-[:TARGETED_STORE {
+                            timestamp: datetime(e.timestamp),
+                            path: e.path,
+                            query: e.query
+                        }]->(st)
+                    }
+
+                    RETURN e.event_id as eventId
+                ", new
                 {
-                    await tx.RunAsync(@"
-                        MATCH (e:Event {session_id: $sessionId, timestamp: $timestamp})
-                        MATCH (st:Store {store_id: $storeId})
-                        CREATE (e)-[:OCCURRED_AT_STORE]->(st)",
-                        new { sessionId, timestamp = timestamp.ToString("o"), storeId });
-                }
+                    eventId,
+                    action,
+                    status,
+                    timestamp = timestamp.ToString("o"),
+                    clientIp,
+                    userAgent,
+                    deviceType,
+                    path,
+                    query,
+                    sessionId,
+                    userId,
+                    storeId,
+                    authTokenId,
+                    data
+                });
 
-                // Create relationship to User if exists
-                if (userId.HasValue)
-                {
-                    await tx.RunAsync(@"
-                        MATCH (e:Event {session_id: $sessionId, timestamp: $timestamp})
-                        MATCH (u:User {user_id: $userId})
-                        CREATE (e)-[:PERFORMED_BY_USER]->(u)",
-                        new { sessionId, timestamp = timestamp.ToString("o"), userId = userId.Value });
-                }
-
-                // Create event sequence relationship (ordered by timestamp)
-                await tx.RunAsync(@"
-                    MATCH (s:Session {session_id: $sessionId})-[:HAS_EVENT]->(events:Event)
-                    WITH events ORDER BY events.timestamp DESC LIMIT 2
-                    WITH collect(events) as eventList
-                    WHERE size(eventList) = 2
-                    WITH eventList[1] as current, eventList[0] as previous
-                    MERGE (previous)-[:NEXT_EVENT]->(current)",
-                    new { sessionId });
+                await result.ConsumeAsync();
             });
 
             _logger.LogInformation(
-                "Stored event in Neo4j: Action={Action}, Category={Category}, SessionId={SessionId}",
-                action, category, sessionId);
+                "Stored event in Neo4j: EventId={EventId}, Action={Action}, IP={ClientIp}",
+                eventId, action, clientIp);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "Failed to store event in Neo4j: Action={Action}, SessionId={SessionId}",
-                action, sessionId);
+                "Failed to store event in Neo4j: Action={Action}, EventId={EventId}",
+                action, eventId);
             throw;
         }
     }
 
     /// <summary>
-    /// Store multiple events in Neo4j in a single batch transaction
+    /// Store multiple events in Neo4j in a single batch transaction (v2.0 model)
+    /// More efficient than individual inserts - uses UNWIND for batch processing
     /// </summary>
     public async Task StoreBatchAsync(IEnumerable<EventBatchItem> events)
     {
@@ -161,112 +170,107 @@ public class Neo4jService : IAsyncDisposable
 
         try
         {
+            // Prepare events for batch insert
+            var eventParams = eventList.Select(item =>
+            {
+                var eventData = item.Event;
+                var timestamp = eventData.GetDateTime("timestamp") ?? DateTime.UtcNow;
+
+                return new Dictionary<string, object>
+                {
+                    { "event_id", eventData.GetString("event_id") ?? Guid.NewGuid().ToString() },
+                    { "action", eventData.GetString("action") ?? "unknown" },
+                    { "status", eventData.GetString("status") },
+                    { "timestamp", timestamp.ToString("o") },
+                    { "client_ip", eventData.GetString("client_ip") ?? "unknown" },
+                    { "user_agent", eventData.GetString("user_agent") },
+                    { "device_type", eventData.GetString("device_type") },
+                    { "path", eventData.GetString("path") ?? "/" },
+                    { "query", eventData.GetString("query") },
+                    { "session_id", eventData.GetString("session_id") },
+                    { "user_id", eventData.GetInt("user_id") },
+                    { "store_id", eventData.GetString("store_id") },
+                    { "auth_token_id", eventData.GetString("auth_token_id") },
+                    { "data", eventData.HasProperty("data") ? eventData.Properties["data"].ToString() : null }
+                };
+            }).ToList();
+
             await session.ExecuteWriteAsync(async tx =>
             {
-                // Process all events in a single transaction
-                foreach (var item in eventList)
-                {
-                    var eventData = item.Event;
-                    var category = item.Category;
+                // Batch insert all events with UNWIND
+                var result = await tx.RunAsync(@"
+                    UNWIND $events AS event
 
-                    var sessionId = eventData.GetString("session_id");
-                    var storeId = eventData.GetString("store_id");
-                    var action = eventData.GetString("action");
-                    var timestamp = eventData.GetDateTime("timestamp") ?? DateTime.UtcNow;
-                    var userId = eventData.GetInt("user_id");
-                    var authTokenId = eventData.GetString("auth_token_id");
+                    // 1. Create Event node
+                    CREATE (e:Event {
+                        event_id: event.event_id,
+                        action: event.action,
+                        status: event.status,
+                        timestamp: datetime(event.timestamp),
+                        client_ip: event.client_ip,
+                        user_agent: event.user_agent,
+                        device_type: event.device_type,
+                        path: event.path,
+                        query: event.query,
+                        session_id: event.session_id,
+                        user_id: event.user_id,
+                        store_id: event.store_id,
+                        auth_token_id: event.auth_token_id,
+                        data: event.data,
+                        archived: false
+                    })
 
-                    // Create or merge Session node
-                    await tx.RunAsync(@"
-                        MERGE (s:Session {session_id: $sessionId})
-                        ON CREATE SET s.created_at = datetime($timestamp)
-                        SET s.last_activity = datetime($timestamp)",
-                        new { sessionId, timestamp = timestamp.ToString("o") });
+                    // 2. MERGE IPAddress
+                    MERGE (ip:IPAddress {address: event.client_ip})
+                    ON CREATE SET
+                        ip.first_seen = datetime(event.timestamp),
+                        ip.last_seen = datetime(event.timestamp)
+                    ON MATCH SET
+                        ip.last_seen = datetime(event.timestamp)
+                    CREATE (e)-[:ORIGINATED_FROM {timestamp: datetime(event.timestamp)}]->(ip)
 
-                    // Create or merge Store node if store_id exists
-                    if (!string.IsNullOrEmpty(storeId))
-                    {
-                        await tx.RunAsync(@"
-                            MERGE (st:Store {store_id: $storeId})
-                            WITH st
-                            MATCH (s:Session {session_id: $sessionId})
-                            MERGE (s)-[:VISITED_STORE]->(st)",
-                            new { storeId, sessionId });
+                    // 3. MERGE Session (if session_id exists)
+                    WITH e, event
+                    CALL {
+                        WITH e, event
+                        WITH e, event WHERE event.session_id IS NOT NULL
+                        MERGE (s:Session {session_id: event.session_id})
+                        ON CREATE SET
+                            s.created_at = datetime(event.timestamp),
+                            s.last_activity = datetime(event.timestamp)
+                        ON MATCH SET
+                            s.last_activity = datetime(event.timestamp)
+                        CREATE (e)-[:IN_SESSION {timestamp: datetime(event.timestamp)}]->(s)
                     }
 
-                    // Create or merge User node if user_id exists
-                    if (userId.HasValue)
-                    {
-                        await tx.RunAsync(@"
-                            MERGE (u:User {user_id: $userId})
-                            WITH u
-                            MATCH (s:Session {session_id: $sessionId})
-                            MERGE (s)-[:BELONGS_TO_USER]->(u)",
-                            new { userId = userId.Value, sessionId });
+                    // 4. MERGE User (if user_id exists)
+                    WITH e, event
+                    CALL {
+                        WITH e, event
+                        WITH e, event WHERE event.user_id IS NOT NULL
+                        MERGE (u:User {user_id: event.user_id})
+                        ON CREATE SET u.created_at = datetime(event.timestamp)
+                        CREATE (e)-[:PERFORMED_BY {timestamp: datetime(event.timestamp)}]->(u)
                     }
 
-                    // Create Event node with all properties
-                    var eventProperties = new Dictionary<string, object>
-                    {
-                        { "action", action ?? "unknown" },
-                        { "category", category },
-                        { "timestamp", timestamp.ToString("o") },
-                        { "session_id", sessionId ?? "" }
-                    };
-
-                    if (!string.IsNullOrEmpty(storeId))
-                        eventProperties["store_id"] = storeId;
-
-                    if (userId.HasValue)
-                        eventProperties["user_id"] = userId.Value;
-
-                    if (!string.IsNullOrEmpty(authTokenId))
-                        eventProperties["auth_token_id"] = authTokenId;
-
-                    // Add data field if present
-                    if (eventData.HasProperty("data"))
-                    {
-                        var dataJson = eventData.Properties["data"].ToString();
-                        eventProperties["data"] = dataJson;
+                    // 5. MERGE Store (if store_id exists)
+                    WITH e, event
+                    CALL {
+                        WITH e, event
+                        WITH e, event WHERE event.store_id IS NOT NULL
+                        MERGE (st:Store {store_id: event.store_id})
+                        ON CREATE SET st.created_at = datetime(event.timestamp)
+                        CREATE (e)-[:TARGETED_STORE {
+                            timestamp: datetime(event.timestamp),
+                            path: event.path,
+                            query: event.query
+                        }]->(st)
                     }
 
-                    await tx.RunAsync(@"
-                        CREATE (e:Event $props)
-                        WITH e
-                        MATCH (s:Session {session_id: $sessionId})
-                        CREATE (s)-[:HAS_EVENT]->(e)",
-                        new { props = eventProperties, sessionId });
+                    RETURN count(e) as events_created
+                ", new { events = eventParams });
 
-                    // Create relationship to Store if exists
-                    if (!string.IsNullOrEmpty(storeId))
-                    {
-                        await tx.RunAsync(@"
-                            MATCH (e:Event {session_id: $sessionId, timestamp: $timestamp})
-                            MATCH (st:Store {store_id: $storeId})
-                            CREATE (e)-[:OCCURRED_AT_STORE]->(st)",
-                            new { sessionId, timestamp = timestamp.ToString("o"), storeId });
-                    }
-
-                    // Create relationship to User if exists
-                    if (userId.HasValue)
-                    {
-                        await tx.RunAsync(@"
-                            MATCH (e:Event {session_id: $sessionId, timestamp: $timestamp})
-                            MATCH (u:User {user_id: $userId})
-                            CREATE (e)-[:PERFORMED_BY_USER]->(u)",
-                            new { sessionId, timestamp = timestamp.ToString("o"), userId = userId.Value });
-                    }
-
-                    // Create event sequence relationship (ordered by timestamp)
-                    await tx.RunAsync(@"
-                        MATCH (s:Session {session_id: $sessionId})-[:HAS_EVENT]->(events:Event)
-                        WITH events ORDER BY events.timestamp DESC LIMIT 2
-                        WITH collect(events) as eventList
-                        WHERE size(eventList) = 2
-                        WITH eventList[1] as current, eventList[0] as previous
-                        MERGE (previous)-[:NEXT_EVENT]->(current)",
-                        new { sessionId });
-                }
+                await result.ConsumeAsync();
             });
 
             _logger.LogInformation("Stored batch of {Count} events in Neo4j", eventList.Count);
