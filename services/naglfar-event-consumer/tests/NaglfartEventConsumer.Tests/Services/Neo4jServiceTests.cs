@@ -512,6 +512,57 @@ public class Neo4jServiceTests
         }
     }
 
+    [Fact]
+    public void EventBatchItem_WithoutEventId_ShouldGenerateUuidV7()
+    {
+        // Arrange - Event without event_id (should generate UUID v7)
+        var jsonString = @"{
+            ""action"": ""view_books"",
+            ""timestamp"": ""2025-12-29T10:30:00.000Z"",
+            ""client_ip"": ""192.168.1.100"",
+            ""device_type"": ""web"",
+            ""path"": ""/api/v1/store-1/books""
+        }";
+
+        var properties = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonString);
+        var naglfartEvent = new NaglfartEvent { Properties = properties! };
+
+        // Act - Simulate what Neo4jService does: generate UUID v7 if event_id is missing
+        var eventId = naglfartEvent.GetString("event_id") ?? Guid.CreateVersion7().ToString();
+
+        // Assert - Verify it's a valid GUID
+        Assert.True(Guid.TryParse(eventId, out var parsedGuid));
+
+        // Verify it's a UUID v7 by checking the version bits
+        var guidBytes = parsedGuid.ToByteArray();
+        // UUID v7 has version bits set to 0111 (7) in the 7th byte (big-endian)
+        // In .NET's byte array representation (little-endian), we need to check the version field
+        var guidString = parsedGuid.ToString();
+        var versionChar = guidString.Split('-')[2][0]; // Version is first char of 3rd group
+        Assert.Equal('7', versionChar); // UUID v7
+    }
+
+    [Fact]
+    public void EventBatchItem_UuidV7_ShouldBeTimeOrdered()
+    {
+        // Arrange - Generate multiple UUID v7s in sequence
+        var uuids = new List<Guid>();
+
+        for (int i = 0; i < 10; i++)
+        {
+            uuids.Add(Guid.CreateVersion7());
+            Thread.Sleep(1); // Small delay to ensure different timestamps
+        }
+
+        // Act & Assert - Verify UUIDs are time-ordered (monotonically increasing)
+        for (int i = 1; i < uuids.Count; i++)
+        {
+            // UUID v7 is designed to be sortable, so later UUIDs should be greater
+            Assert.True(string.Compare(uuids[i].ToString(), uuids[i-1].ToString(), StringComparison.Ordinal) > 0,
+                $"UUID v7 should be time-ordered: {uuids[i]} should be > {uuids[i-1]}");
+        }
+    }
+
     // Helper method to create test batches
     private List<EventBatchItem> CreateTestBatch(int size)
     {

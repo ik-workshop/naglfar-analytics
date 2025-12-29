@@ -30,7 +30,7 @@ public class Neo4jService : IAsyncDisposable
     public async Task StoreEventAsync(NaglfartEvent eventData, string category)
     {
         // Extract all event properties
-        var eventId = eventData.GetString("event_id") ?? Guid.NewGuid().ToString();
+        var eventId = eventData.GetString("event_id") ?? Guid.CreateVersion7().ToString();
         var action = eventData.GetString("action") ?? "unknown";
         var status = eventData.GetString("status");
         var timestamp = eventData.GetDateTime("timestamp") ?? DateTime.UtcNow;
@@ -178,7 +178,7 @@ public class Neo4jService : IAsyncDisposable
 
                 return new Dictionary<string, object>
                 {
-                    { "event_id", eventData.GetString("event_id") ?? Guid.NewGuid().ToString() },
+                    { "event_id", eventData.GetString("event_id") ?? Guid.CreateVersion7().ToString() },
                     { "action", eventData.GetString("action") ?? "unknown" },
                     { "status", eventData.GetString("status") },
                     { "timestamp", timestamp.ToString("o") },
