@@ -1,7 +1,7 @@
 # Naglfar Analytics - Changelog & Analysis
 
 > **Note**: This file is automatically updated whenever the project changes.
-> Last Updated: 2025-12-28
+> Last Updated: 2025-12-29
 
 ---
 
@@ -90,6 +90,67 @@ A multi-service authentication and analytics platform providing **event-driven a
 ---
 
 ## Changelog
+
+### 2025-12-29 - Neo4j Graph Model v2.0 Implementation
+
+#### Added
+
+- **✅ Neo4j v2.0 Event-Centric Model** (`services/naglfar-event-consumer/src/NaglfartEventConsumer/Services/Neo4jService.cs`):
+  - **Complete Rewrite**: Implemented simplified event-centric graph model where entities are identity containers only
+  - **Event Properties**: All data stored in Event nodes including:
+    - Core: `event_id`, `action`, `status`, `timestamp`
+    - Network: `client_ip`, `user_agent`, `device_type`
+    - Request: `path`, `query`
+    - Identity: `session_id`, `user_id`, `store_id`, `auth_token_id`
+    - Metadata: `data` (JSON), `archived` (boolean)
+  - **Entity Nodes**: Minimal identity-only nodes (IPAddress, Session, User, Store)
+  - **Relationships**: v2.0 relationships (ORIGINATED_FROM, IN_SESSION, PERFORMED_BY, TARGETED_STORE)
+  - **Batch Processing**: UNWIND-based batch inserts with single transaction
+  - **Conditional Relationships**: CALL subqueries for optional entity relationships
+
+- **✅ Comprehensive Test Coverage** (`tests/NaglfartEventConsumer.Tests/Services/Neo4jServiceTests.cs`):
+  - Updated all tests to cover v2.0 model fields
+  - Added auth event tests with status field (pass/fail)
+  - Added device type tests (mobile/web)
+  - Added e-token creation event tests
+  - Added brute force attack pattern tests
+  - **30 tests passing** covering all v2.0 scenarios
+
+- **✅ Graph Model Specification Updates**:
+  - `services/graph-model.yml` - Complete v2.0 YAML specification with device_type and archived fields
+  - `docs/assets/diagrams/graph-relationships/er.mmd` - Updated ER diagram with all v2.0 properties
+  - `specs/graph-model.md` - Event-centric design philosophy documented
+
+#### Changed
+
+- **StoreEventAsync Method**: Single comprehensive Cypher query replaces multiple queries
+- **StoreBatchAsync Method**: Batch processing with proper event preparation and UNWIND execution
+- **Entity Creation**: Changed from property-rich entities to minimal identity nodes
+- **Relationship Strategy**: Removed entity counters and abuse state, moved all detection logic to Event queries
+
+#### Removed
+
+- Old v1.0 entity counters (failed_auth_count, request_count, etc.)
+- Obsolete relationships (HAS_EVENT, VISITED_STORE, BELONGS_TO_USER, etc.)
+- Entity-level abuse detection properties
+
+#### Technical Details
+
+**Architecture Change**: v1.0 → v2.0
+- **v1.0 (Archived)**: Entity-centric with counters and abuse state in entities
+- **v2.0 (Current)**: Event-centric with all data in Event nodes, abuse detection via graph queries
+
+**Performance Improvements**:
+- Single Cypher query per event (was multiple queries)
+- UNWIND batch processing for bulk inserts
+- Indexed Event properties for fast abuse detection queries
+
+**Database Schema**:
+- 5 entity types: Event (data), IPAddress, Session, User, Store (identity)
+- 5 relationship types: ORIGINATED_FROM, IN_SESSION, PERFORMED_BY, TARGETED_STORE, NEXT_EVENT
+- 10+ indexes including composite index on (action, status, timestamp)
+
+---
 
 ### 2025-12-28 (Part 6) - Graph Database Model & naglfar-validation Event Publishing
 

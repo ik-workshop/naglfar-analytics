@@ -199,7 +199,7 @@ The Naglfar Validation Service implements an authentication gateway that enforce
 
 ### Authentication Flow
 
-![Authentication Flow](../../docs/assets/diagrams/naglfar-validation/authentication-flow.svg)
+![Authentication Flow](../../docs/assets/diagrams/naglfar-validation/request-flow.svg)
 
 ### E-TOKEN (Ephemeral Token)
 

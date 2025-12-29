@@ -1,16 +1,27 @@
-# Graph Database Data Model Specification
-# This file defines the entity and relationship model for storing events in Neo4j
-# for abuse detection and analytics
+# Naglfar Analytics - Graph Database Model Specification
+# Version: 2.0 (Simplified Event-Centric Model)
+# Based on: specs/graph-model.md
+# Date: 2025-12-29
 
-version: "1.0"
-description: "Graph database model for Naglfar Analytics event storage and abuse detection"
+version: "2.0"
+description: "Event-centric graph model for abuse detection. Entities are identity nodes, Events contain all data."
 
-# Entity Definitions
+design_philosophy:
+  principle: "Entities are identity containers. Events contain all data. Abuse detection happens through Event queries."
+  entity_role: "Minimal nodes representing identity (IP, Session, User, Store)"
+  event_role: "Rich nodes containing all request/event data"
+  relationship_role: "Connect Events to Entities for querying"
+  abuse_detection: "Query Event patterns, not entity properties"
+
+# ==============================================================================
+# ENTITY DEFINITIONS
+# ==============================================================================
+
 entities:
-  # IP Address tracking for abuse detection
+  # IP Address - Identity node for grouping events by IP
   IPAddress:
     label: "IPAddress"
-    description: "Represents a client IP address accessing the system"
+    description: "Represents a unique client IP address"
     properties:
       address:
         type: "string"
@@ -26,91 +37,8 @@ entities:
         type: "datetime"
         required: true
         description: "Most recent activity from this IP"
-      total_requests:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Total number of requests from this IP"
-      failed_auth_count:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Number of failed authentication attempts"
-      is_blocked:
-        type: "boolean"
-        required: true
-        default: false
-        indexed: true
-        description: "Whether this IP is currently blocked"
-      country:
-        type: "string"
-        required: false
-        description: "Country code (ISO 3166-1 alpha-2)"
-      city:
-        type: "string"
-        required: false
-        description: "City name"
-      asn:
-        type: "string"
-        required: false
-        description: "Autonomous System Number"
-      is_vpn:
-        type: "boolean"
-        required: false
-        description: "Whether IP is from a known VPN provider"
-      is_tor:
-        type: "boolean"
-        required: false
-        description: "Whether IP is a Tor exit node"
 
-  # User Agent tracking for bot detection
-  UserAgent:
-    label: "UserAgent"
-    description: "Represents a client user agent string"
-    properties:
-      user_agent:
-        type: "string"
-        required: true
-        indexed: true
-        unique: true
-        description: "Full user agent string"
-      first_seen:
-        type: "datetime"
-        required: true
-        description: "First time this user agent was observed"
-      last_seen:
-        type: "datetime"
-        required: true
-        description: "Most recent activity with this user agent"
-      request_count:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Total requests with this user agent"
-      is_bot:
-        type: "boolean"
-        required: true
-        default: false
-        indexed: true
-        description: "Whether this appears to be a bot"
-      browser:
-        type: "string"
-        required: false
-        description: "Parsed browser name"
-      browser_version:
-        type: "string"
-        required: false
-        description: "Parsed browser version"
-      os:
-        type: "string"
-        required: false
-        description: "Parsed operating system"
-      device:
-        type: "string"
-        required: false
-        description: "Parsed device type (desktop, mobile, tablet)"
-
-  # Session tracking for hijacking detection
+  # Session - Identity node for grouping events by session
   Session:
     label: "Session"
     description: "Represents a user session (UUID v7)"
@@ -120,7 +48,7 @@ entities:
         required: true
         indexed: true
         unique: true
-        description: "Session UUID v7"
+        description: "Session identifier (UUID v7)"
       created_at:
         type: "datetime"
         required: true
@@ -129,70 +57,24 @@ entities:
         type: "datetime"
         required: true
         description: "Most recent activity in this session"
-      event_count:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Number of events in this session"
-      is_suspicious:
-        type: "boolean"
-        required: true
-        default: false
-        indexed: true
-        description: "Flagged as suspicious (e.g., IP changes)"
-      ip_count:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Number of distinct IPs used in this session"
-      user_agent_count:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Number of distinct user agents in this session"
 
-  # User account tracking
+  # User - Identity node for grouping events by user
   User:
     label: "User"
-    description: "Represents a registered user account"
+    description: "Represents an authenticated user account"
     properties:
       user_id:
         type: "integer"
         required: true
         indexed: true
         unique: true
-        description: "User ID from authentication system"
+        description: "User account ID"
       created_at:
         type: "datetime"
         required: true
-        description: "Account creation timestamp"
-      last_login:
-        type: "datetime"
-        required: false
-        description: "Most recent successful login"
-      failed_auth_attempts:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Failed authentication attempts"
-      is_locked:
-        type: "boolean"
-        required: true
-        default: false
-        indexed: true
-        description: "Whether account is locked due to abuse"
-      total_sessions:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Total number of sessions created"
-      total_orders:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Total number of orders placed"
+        description: "First seen timestamp"
 
-  # Store tracking
+  # Store - Identity node for grouping events by store
   Store:
     label: "Store"
     description: "Represents a store/tenant in the system"
@@ -203,34 +85,15 @@ entities:
         indexed: true
         unique: true
         description: "Store identifier (e.g., 'store-1')"
-      first_activity:
+      created_at:
         type: "datetime"
         required: true
-        description: "First event for this store"
-      last_activity:
-        type: "datetime"
-        required: true
-        description: "Most recent event for this store"
-      total_visits:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Total unique session visits"
-      total_events:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Total events for this store"
-      failed_auth_count:
-        type: "integer"
-        required: true
-        default: 0
-        description: "Failed auth attempts for this store"
+        description: "First seen timestamp"
 
-  # Event tracking (preserves raw data)
+  # Event - Primary data node containing all event information
   Event:
     label: "Event"
-    description: "Represents a single event occurrence"
+    description: "Represents a single event occurrence. This is the primary data node."
     properties:
       event_id:
         type: "string"
@@ -242,254 +105,174 @@ entities:
         type: "string"
         required: true
         indexed: true
-        description: "Event action type (from event.yaml)"
-      category:
-        type: "string"
-        required: true
-        indexed: true
-        description: "Event category (auth, commerce, navigation)"
+        description: "Event action (e.g., 'auth_token_validated', 'e_token_created', 'view_books')"
       status:
         type: "string"
         required: false
         indexed: true
-        description: "Event status (pass, fail, etc.)"
+        description: "Event status ('pass', 'fail') - for auth events only"
       timestamp:
         type: "datetime"
         required: true
         indexed: true
         description: "Event occurrence timestamp (ISO 8601)"
-      session_id:
+      client_ip:
         type: "string"
         required: true
         indexed: true
-        description: "Session UUID v7"
-      location:
+        description: "Client IP address (denormalized for quick access)"
+      user_agent:
         type: "string"
-        required: true
-        description: "Full request path with query string"
+        required: false
+        description: "User agent string"
+      device_type:
+        type: "string"
+        required: false
+        indexed: true
+        description: "Device type ('mobile' or 'web')"
       path:
         type: "string"
         required: true
         indexed: true
-        description: "Request path only"
+        description: "Request path (without query string)"
       query:
         type: "string"
         required: false
         description: "Query string"
+      session_id:
+        type: "string"
+        required: false
+        indexed: true
+        description: "Session identifier (if available)"
+      user_id:
+        type: "integer"
+        required: false
+        indexed: true
+        description: "User ID (if authenticated)"
+      store_id:
+        type: "string"
+        required: false
+        indexed: true
+        description: "Store identifier (if available)"
       auth_token_id:
         type: "string"
-        required: true
-        description: "AUTH-TOKEN or E-TOKEN value"
+        required: false
+        indexed: true
+        description: "Auth token identifier (if available)"
       data:
         type: "json"
         required: false
-        description: "Event-specific data (raw JSON)"
+        description: "Event-specific data payload (JSON)"
+      archived:
+        type: "boolean"
+        required: true
+        indexed: true
+        default: false
+        description: "Whether event has been archived (excluded from active queries)"
 
-# Relationship Definitions
+# ==============================================================================
+# RELATIONSHIP DEFINITIONS
+# ==============================================================================
+
 relationships:
-  # IP Address relationships
-  - type: "ORIGINATES_FROM"
-    description: "Event originated from IP address"
+  # Event → IPAddress
+  - type: "ORIGINATED_FROM"
+    description: "Event originated from this IP address"
     from: "Event"
     to: "IPAddress"
+    cardinality: "many-to-one"
+    required: true
     properties:
       timestamp:
         type: "datetime"
         required: true
         description: "When this event occurred"
+    notes: "Always created for every event"
 
-  - type: "FAILED_AUTH"
-    description: "Failed authentication attempt from IP"
-    from: "IPAddress"
-    to: "Store"
-    properties:
-      count:
-        type: "integer"
-        required: true
-        default: 1
-        description: "Number of failed attempts"
-      first_attempt:
-        type: "datetime"
-        required: true
-        description: "First failed attempt timestamp"
-      last_attempt:
-        type: "datetime"
-        required: true
-        description: "Most recent failed attempt timestamp"
-
-  # User Agent relationships
-  - type: "USES_AGENT"
-    description: "Event used specific user agent"
-    from: "Event"
-    to: "UserAgent"
-    properties:
-      timestamp:
-        type: "datetime"
-        required: true
-        description: "When this event occurred"
-
-  # Session relationships
+  # Event → Session
   - type: "IN_SESSION"
-    description: "Event occurred in session"
+    description: "Event occurred in this session"
     from: "Event"
     to: "Session"
+    cardinality: "many-to-one"
+    required: false
     properties:
-      sequence_number:
-        type: "integer"
+      timestamp:
+        type: "datetime"
+        required: true
+        description: "When this event occurred"
+    notes: "Only created if event has session_id"
+
+  # Event → User
+  - type: "PERFORMED_BY"
+    description: "Event performed by this user"
+    from: "Event"
+    to: "User"
+    cardinality: "many-to-one"
+    required: false
+    properties:
+      timestamp:
+        type: "datetime"
+        required: true
+        description: "When this event occurred"
+    notes: "Only created if event has user_id (authenticated events)"
+
+  # Event → Store
+  - type: "TARGETED_STORE"
+    description: "Event targeted this store"
+    from: "Event"
+    to: "Store"
+    cardinality: "many-to-one"
+    required: false
+    properties:
+      timestamp:
+        type: "datetime"
+        required: true
+        description: "When this event occurred"
+      path:
+        type: "string"
+        required: true
+        description: "Request path (denormalized for quick access)"
+      query:
+        type: "string"
         required: false
-        description: "Event sequence number in session"
+        description: "Query string (denormalized)"
+    notes: "Only created if event has store_id"
 
-  - type: "USED_IP"
-    description: "Session used specific IP address"
-    from: "Session"
-    to: "IPAddress"
-    properties:
-      first_used:
-        type: "datetime"
-        required: true
-        description: "First time IP was used in this session"
-      last_used:
-        type: "datetime"
-        required: true
-        description: "Last time IP was used in this session"
-      event_count:
-        type: "integer"
-        required: true
-        default: 1
-        description: "Number of events from this IP in session"
-
-  - type: "USED_AGENT"
-    description: "Session used specific user agent"
-    from: "Session"
-    to: "UserAgent"
-    properties:
-      first_used:
-        type: "datetime"
-        required: true
-        description: "First time agent was used in this session"
-      last_used:
-        type: "datetime"
-        required: true
-        description: "Last time agent was used in this session"
-
-  # User relationships
-  - type: "AUTHENTICATED_AS"
-    description: "Event authenticated as user"
-    from: "Event"
-    to: "User"
-    properties:
-      timestamp:
-        type: "datetime"
-        required: true
-        description: "Authentication timestamp"
-
-  - type: "BELONGS_TO"
-    description: "Session belongs to authenticated user"
-    from: "Session"
-    to: "User"
-    properties:
-      authenticated_at:
-        type: "datetime"
-        required: true
-        description: "When user authenticated in this session"
-
-  - type: "LOGGED_IN_FROM"
-    description: "User logged in from IP address"
-    from: "User"
-    to: "IPAddress"
-    properties:
-      login_count:
-        type: "integer"
-        required: true
-        default: 1
-        description: "Number of logins from this IP"
-      first_login:
-        type: "datetime"
-        required: true
-        description: "First login from this IP"
-      last_login:
-        type: "datetime"
-        required: true
-        description: "Most recent login from this IP"
-
-  # Store relationships
-  - type: "FOR_STORE"
-    description: "Event occurred for specific store"
-    from: "Event"
-    to: "Store"
-    properties:
-      timestamp:
-        type: "datetime"
-        required: true
-        description: "Event timestamp"
-
-  - type: "VISITED_STORE"
-    description: "Session visited store"
-    from: "Session"
-    to: "Store"
-    properties:
-      first_visit:
-        type: "datetime"
-        required: true
-        description: "First event in this session for this store"
-      event_count:
-        type: "integer"
-        required: true
-        default: 1
-        description: "Number of events in this store visit"
-
-  # Temporal relationships
+  # Event → Event (Temporal)
   - type: "NEXT_EVENT"
     description: "Sequential event in same session"
     from: "Event"
     to: "Event"
+    cardinality: "one-to-one"
+    required: false
     properties:
       time_delta_ms:
         type: "integer"
         required: true
         description: "Milliseconds between events"
+    notes: "Only created between consecutive events in same session"
 
-# Indexes and Constraints
+# ==============================================================================
+# INDEXES AND CONSTRAINTS
+# ==============================================================================
+
 indexes:
+  # Unique Constraints
   - entity: "IPAddress"
     property: "address"
     type: "unique"
     description: "Unique constraint on IP address"
-
-  - entity: "IPAddress"
-    property: "is_blocked"
-    type: "index"
-    description: "Fast lookup of blocked IPs"
-
-  - entity: "UserAgent"
-    property: "user_agent"
-    type: "unique"
-    description: "Unique constraint on user agent string"
-
-  - entity: "UserAgent"
-    property: "is_bot"
-    type: "index"
-    description: "Fast lookup of bot user agents"
 
   - entity: "Session"
     property: "session_id"
     type: "unique"
     description: "Unique constraint on session ID"
 
-  - entity: "Session"
-    property: "is_suspicious"
-    type: "index"
-    description: "Fast lookup of suspicious sessions"
-
   - entity: "User"
     property: "user_id"
     type: "unique"
     description: "Unique constraint on user ID"
-
-  - entity: "User"
-    property: "is_locked"
-    type: "index"
-    description: "Fast lookup of locked accounts"
 
   - entity: "Store"
     property: "store_id"
@@ -501,139 +284,250 @@ indexes:
     type: "unique"
     description: "Unique constraint on event ID"
 
+  # Event Performance Indexes
   - entity: "Event"
     property: "timestamp"
     type: "index"
-    description: "Fast temporal queries"
+    description: "Critical for time-window abuse detection queries"
 
   - entity: "Event"
     property: "action"
     type: "index"
-    description: "Fast lookup by action type"
+    description: "Filter by event type"
 
   - entity: "Event"
-    property: "category"
+    property: "status"
     type: "index"
-    description: "Fast lookup by category"
+    description: "Filter by pass/fail"
+
+  - entity: "Event"
+    property: "path"
+    type: "index"
+    description: "Identify targeted endpoints"
+
+  - entity: "Event"
+    property: "client_ip"
+    type: "index"
+    description: "Quick IP lookup in events"
+
+  - entity: "Event"
+    property: "device_type"
+    type: "index"
+    description: "Filter by mobile/web"
 
   - entity: "Event"
     property: "session_id"
     type: "index"
-    description: "Fast lookup by session"
+    description: "Quick session lookup"
 
-# Event Categories Mapping
-# Maps event actions from event.yaml to categories
-event_categories:
-  auth:
-    - "e_token_created"
-    - "auth_token_validated"
-    - "user_register"
-    - "user_login"
+  - entity: "Event"
+    property: "user_id"
+    type: "index"
+    description: "Quick user lookup"
 
-  commerce:
-    - "add_to_cart"
-    - "remove_from_cart"
-    - "view_cart"
-    - "checkout"
-    - "view_order"
-    - "view_orders"
+  - entity: "Event"
+    property: "store_id"
+    type: "index"
+    description: "Quick store lookup"
 
-  navigation:
-    - "view_books"
-    - "search_books"
-    - "view_book_detail"
-    - "check_inventory"
-    - "list_stores"
-    - "page_view"
+  - entity: "Event"
+    property: "auth_token_id"
+    type: "index"
+    description: "Token abuse detection"
 
-# Abuse Detection Patterns
-# Common queries for detecting abuse
+  # Composite Index
+  - entity: "Event"
+    properties:
+      - "action"
+      - "status"
+      - "timestamp"
+    type: "composite"
+    description: "Common abuse detection queries (e.g., failed auth in time window)"
+
+# ==============================================================================
+# EVENT SOURCES
+# ==============================================================================
+
+event_sources:
+  layer_3_4:
+    description: "naglfar-validation service (auth layer)"
+    events:
+      - action: "auth_token_validated"
+        status: "pass or fail"
+        fields: ["client_ip", "user_agent", "device_type", "path", "query", "store_id", "session_id", "user_id", "auth_token_id"]
+      - action: "e_token_created"
+        fields: ["client_ip", "user_agent", "device_type", "path", "query", "store_id"]
+
+  layer_5:
+    description: "Backend services (book-store, etc.) - analytics only"
+    events:
+      - action: "view_books, add_to_cart, checkout, etc."
+        fields: ["session_id", "user_id", "store_id", "client_ip", "device_type", "auth_token_id", "data"]
+
+# ==============================================================================
+# ABUSE DETECTION QUERIES
+# ==============================================================================
+
 abuse_patterns:
   brute_force:
-    description: "Detect brute force authentication attempts"
+    description: "Detect IPs with multiple failed auth attempts"
     query: |
-      MATCH (ip:IPAddress)-[r:FAILED_AUTH]->(s:Store)
-      WHERE r.last_attempt > datetime() - duration({minutes: 5})
-        AND r.count >= 10
-      RETURN ip.address, s.store_id, r.count, r.last_attempt
-      ORDER BY r.count DESC
+      MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress)
+      WHERE e.action = 'auth_token_validated'
+        AND e.status = 'fail'
+        AND e.timestamp > datetime() - duration('PT5M')
+      WITH ip.address as ip_address, count(e) as failed_count
+      WHERE failed_count >= 10
+      RETURN ip_address, failed_count
+      ORDER BY failed_count DESC
     threshold: 10
-    window_minutes: 5
-
-  session_hijacking:
-    description: "Detect session hijacking (multiple IPs in one session)"
-    query: |
-      MATCH (session:Session)-[:USED_IP]->(ip:IPAddress)
-      WITH session, count(DISTINCT ip) as ip_count
-      WHERE ip_count > 1
-      RETURN session.session_id, ip_count, session.is_suspicious
-      ORDER BY ip_count DESC
-    threshold: 1  # More than 1 IP is suspicious
+    window: "5 minutes"
 
   ddos:
-    description: "Detect DDoS attacks (excessive requests from single IP)"
+    description: "Detect IPs making excessive requests"
     query: |
-      MATCH (ip:IPAddress)-[:ORIGINATES_FROM]->(e:Event)
-      WHERE e.timestamp > datetime() - duration({minutes: 1})
-      WITH ip, count(e) as request_count
+      MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress)
+      WHERE e.timestamp > datetime() - duration('PT1M')
+      WITH ip.address as ip_address, count(e) as request_count
       WHERE request_count > 100
-      RETURN ip.address, request_count, ip.is_blocked
+      RETURN ip_address, request_count
       ORDER BY request_count DESC
     threshold: 100
-    window_minutes: 1
+    window: "1 minute"
 
-  bot_detection:
-    description: "Detect bot traffic (high request rate from user agent)"
+  session_sharing:
+    description: "Detect sessions used by multiple user accounts"
     query: |
-      MATCH (ua:UserAgent)-[:USES_AGENT]-(e:Event)
-      WHERE e.timestamp > datetime() - duration({minutes: 5})
-      WITH ua, count(e) as request_count,
-           count(DISTINCT e.session_id) as session_count
-      WHERE request_count > 50 AND session_count > 10
-      RETURN ua.user_agent, request_count, session_count, ua.is_bot
-      ORDER BY request_count DESC
-    threshold: 50
-    window_minutes: 5
+      MATCH (e:Event)-[:IN_SESSION]->(s:Session)
+      WHERE e.user_id IS NOT NULL
+      WITH s.session_id as session_id, collect(DISTINCT e.user_id) as user_ids
+      WHERE size(user_ids) > 1
+      RETURN session_id, user_ids, size(user_ids) as user_count
+      ORDER BY user_count DESC
+    threshold: 1
 
-  credential_stuffing:
-    description: "Detect credential stuffing (multiple accounts from same IP)"
+  ip_behavior:
+    description: "Detect IPs used by multiple user accounts"
     query: |
-      MATCH (ip:IPAddress)-[:ORIGINATES_FROM]->(e:Event)-[:AUTHENTICATED_AS]->(u:User)
-      WHERE e.status = 'fail'
-        AND e.timestamp > datetime() - duration({minutes: 10})
-      WITH ip, count(DISTINCT u) as user_count
-      WHERE user_count > 5
-      RETURN ip.address, user_count
+      MATCH (e:Event)-[:ORIGINATED_FROM]->(ip:IPAddress)
+      WHERE e.user_id IS NOT NULL
+        AND e.timestamp > datetime() - duration('PT1H')
+      WITH ip.address as ip_address, collect(DISTINCT e.user_id) as user_ids
+      WHERE size(user_ids) > 5
+      RETURN ip_address, user_ids, size(user_ids) as user_count
       ORDER BY user_count DESC
     threshold: 5
-    window_minutes: 10
+    window: "1 hour"
 
-  rapid_requests:
-    description: "Detect rapid sequential requests (automated scripts)"
+  store_attacks:
+    description: "Identify most attacked stores and endpoints"
     query: |
-      MATCH (e1:Event)-[r:NEXT_EVENT]->(e2:Event)
-      WHERE r.time_delta_ms < 100
-      RETURN e1.session_id, count(*) as rapid_count
-      ORDER BY rapid_count DESC
-    threshold: 100  # milliseconds
+      MATCH (e:Event)-[:TARGETED_STORE]->(store:Store)
+      WHERE e.action = 'auth_token_validated'
+        AND e.status = 'fail'
+        AND e.timestamp > datetime() - duration('PT1H')
+      WITH store.store_id as store_id, count(e) as failed_attempts
+      RETURN store_id, failed_attempts
+      ORDER BY failed_attempts DESC
+      LIMIT 10
+    window: "1 hour"
 
-  endpoint_abuse:
-    description: "Detect excessive requests to specific endpoint"
+  token_abuse:
+    description: "Detect auth tokens used by different users or stores"
     query: |
       MATCH (e:Event)
-      WHERE e.timestamp > datetime() - duration({minutes: 5})
-        AND e.path = '/api/v1/store-1/auth/login'
-      WITH e.path, count(e) as hit_count
-      WHERE hit_count > 50
-      RETURN e.path, hit_count
-    threshold: 50
-    window_minutes: 5
+      WHERE e.auth_token_id IS NOT NULL
+        AND e.user_id IS NOT NULL
+        AND e.timestamp > datetime() - duration('PT1H')
+      WITH e.auth_token_id as token_id, collect(DISTINCT e.user_id) as user_ids
+      WHERE size(user_ids) > 1
+      RETURN token_id, user_ids, size(user_ids) as user_count
+      ORDER BY user_count DESC
+    threshold: 1
+    window: "1 hour"
 
-  geographic_anomaly:
-    description: "Detect impossible travel (same user from different countries)"
+  flow_anomaly:
+    description: "Detect IPs that validate tokens without requesting e_token"
     query: |
-      MATCH (u:User)-[:LOGGED_IN_FROM]->(ip:IPAddress)
-      WHERE ip.country IS NOT NULL
-      WITH u, collect(DISTINCT ip.country) as countries
-      WHERE size(countries) > 1
-      RETURN u.user_id, countries
+      MATCH (e_auth:Event)-[:ORIGINATED_FROM]->(ip:IPAddress)
+      WHERE e_auth.action = 'auth_token_validated'
+        AND e_auth.timestamp > datetime() - duration('PT24H')
+      WITH ip, collect(e_auth) as auth_events
+      MATCH (e_token:Event)-[:ORIGINATED_FROM]->(ip)
+      WHERE e_token.action = 'e_token_created'
+        AND e_token.timestamp > datetime() - duration('PT24H')
+      WITH ip, auth_events, collect(e_token) as token_events
+      WHERE size(auth_events) > 0 AND size(token_events) = 0
+      RETURN ip.address, size(auth_events) as auth_count
+      ORDER BY auth_count DESC
+    window: "24 hours"
+
+  endpoint_targeting:
+    description: "Identify most targeted endpoints"
+    query: |
+      MATCH (e:Event)
+      WHERE e.action = 'auth_token_validated'
+        AND e.status = 'fail'
+        AND e.timestamp > datetime() - duration('PT1H')
+      WITH e.path as path, count(e) as failed_count
+      RETURN path, failed_count
+      ORDER BY failed_count DESC
+      LIMIT 20
+    window: "1 hour"
+
+  device_anomaly:
+    description: "Detect unusual device type patterns (same session switching devices)"
+    query: |
+      MATCH (e:Event)-[:IN_SESSION]->(s:Session)
+      WHERE e.device_type IS NOT NULL
+        AND e.timestamp > datetime() - duration('PT1H')
+      WITH s.session_id as session_id, collect(DISTINCT e.device_type) as device_types
+      WHERE size(device_types) > 1
+      RETURN session_id, device_types
+      ORDER BY size(device_types) DESC
+    threshold: 1
+    window: "1 hour"
+
+  mobile_vs_web_attacks:
+    description: "Compare attack patterns by device type"
+    query: |
+      MATCH (e:Event)
+      WHERE e.action = 'auth_token_validated'
+        AND e.status = 'fail'
+        AND e.timestamp > datetime() - duration('PT24H')
+      WITH e.device_type as device_type, count(e) as failed_count
+      RETURN device_type, failed_count
+      ORDER BY failed_count DESC
+    window: "24 hours"
+
+# ==============================================================================
+# DATA FLOW
+# ==============================================================================
+
+data_flow:
+  event_processing:
+    - step: "Event arrives from Redis"
+    - step: "Extract all fields from event JSON"
+    - step: "Create Event node with all properties"
+    - step: "MERGE entities (IPAddress, Session, User, Store)"
+    - step: "Create relationships (Event → entities)"
+    - step: "Create temporal link (Event → previous Event in session)"
+
+  batch_processing:
+    description: "Process events in batches for performance"
+    batch_size: 50
+    transaction: "Single transaction per batch"
+    entity_handling: "MERGE (idempotent)"
+    event_handling: "CREATE (always new)"
+
+# ==============================================================================
+# NOTES
+# ==============================================================================
+
+notes:
+  - "This is version 2.0 - simplified event-centric model"
+  - "Version 1.0 (archived) had entity counters and abuse state - now removed"
+  - "All abuse detection happens through Event queries"
+  - "Entities are minimal identity nodes only"
+  - "Event nodes can be pruned/archived over time"
+  - "Single source of truth: Event nodes"
