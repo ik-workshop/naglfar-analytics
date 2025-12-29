@@ -4,6 +4,7 @@
 
 - Redis http://localhost:5540/
 - Traefik http://localhost:8080/dashboard/
+- Neo4j http://localhost:7474/
 
 These endpoints are used for health checks and monitoring:
 

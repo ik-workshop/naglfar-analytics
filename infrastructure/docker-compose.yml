@@ -119,8 +119,12 @@ services:
     networks:
       - naglfar-network
     depends_on:
-      - redis
-      - neo4j
+      redis:
+        condition: service_started
+      neo4j:
+        condition: service_healthy
+      neo4j-init:
+        condition: service_completed_successfully
     labels:
       - "traefik.enable=false"
 
@@ -198,6 +202,20 @@ services:
       timeout: 10s
       retries: 5
       start_period: 40s
+
+  neo4j-init:
+    image: "neo4j:5.9"
+    container_name: neo4j-init
+    networks:
+      - naglfar-network
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    volumes:
+      - ./neo4j/init-schema.cypher:/init/init-schema.cypher:ro
+      - ./neo4j/init.sh:/init/init.sh:ro
+    entrypoint: ["/bin/bash", "/init/init.sh"]
+    restart: "no"
 
 networks:
   naglfar-network:
